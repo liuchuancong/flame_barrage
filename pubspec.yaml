@@ -1,0 +1,18 @@
+name: flame_barrage
+description: A high-performance live broadcast barrage plugin based on Flame engine.
+version: 0.0.1
+homepage: https://github.com/liuchuancong/flame_barrage
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flame: ^1.37.0
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
