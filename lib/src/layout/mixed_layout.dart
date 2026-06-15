@@ -1,45 +1,43 @@
 import 'dart:ui' as ui;
-import 'fragment.dart';
-import 'layout_span.dart';
-import 'layout_result.dart';
-import 'text_fragment.dart';
-import 'emoji_fragment.dart';
-import '../cache/text_cache.dart';
-import '../atlas/emoji_atlas.dart';
-import '../core/barrage_config.dart';
-import '../effect/stroke_effect.dart';
-import '../effect/shadow_effect.dart';
-import '../animation/sprite_animation_player.dart';
+import 'package:flame_barrage/flame_barrage.dart';
 
 class MixedLayout {
-  MixedLayout({required this.atlas}) : _textCache = TextCache(maxSize: 1000);
+  MixedLayout({required this.atlas, int maxTextCacheSize = 1000}) : _textCache = TextCache(maxSize: maxTextCacheSize);
 
   final EmojiAtlas atlas;
-  final TextCache _textCache;
+  TextCache _textCache;
   final Map<String, LayoutResult> _cache = {};
 
   int get cacheCount => _cache.length;
+
+  void updateMaxTextCacheSize(int newSize) {
+    if (_textCache.maxSize == newSize) return;
+    final newCache = TextCache(maxSize: newSize);
+    _textCache.clear();
+    _textCache = newCache;
+    _cache.clear();
+  }
 
   void clearCache() {
     _cache.clear();
     _textCache.clear();
   }
 
-  LayoutResult layout(List<Fragment> fragments, {required BarrageConfig config}) {
-    final cacheKey = _buildCacheKey(fragments, config);
+  LayoutResult layout(List<Fragment> fragments, {required BarrageItem item, required BarrageConfig config}) {
+    final cacheKey = '${_buildCacheKey(fragments, config)}|${item.priority}';
 
     final cached = _cache[cacheKey];
     if (cached != null) {
       return cached;
     }
 
-    final result = _layoutInternal(fragments, config, cacheKey);
+    final result = _layoutInternal(fragments, item, config, cacheKey);
     _cache[cacheKey] = result;
 
     return result;
   }
 
-  LayoutResult _layoutInternal(List<Fragment> fragments, BarrageConfig config, String cacheKey) {
+  LayoutResult _layoutInternal(List<Fragment> fragments, BarrageItem item, BarrageConfig config, String cacheKey) {
     final spans = <LayoutSpan>[];
     double currentX = 0.0;
     double maxHeight = 0.0;
@@ -57,39 +55,55 @@ class MixedLayout {
 
         if (height > maxHeight) maxHeight = height;
 
-        spans.add(
-          TextLayoutSpan(
+        final interceptors = config.effectInterceptors;
+        final intceptorLen = interceptors.length;
+        dynamic matchedInterceptor;
+
+        for (int j = 0; j < intceptorLen; j++) {
+          if (interceptors[j].shouldIntercept(item, config)) {
+            matchedInterceptor = interceptors[j];
+            break;
+          }
+        }
+
+        if (matchedInterceptor != null) {
+          final customSpan = matchedInterceptor.createCustomSpan(
+            item: item,
+            text: fragment.text,
+            paragraph: paragraph,
             x: currentX,
             y: 0.0,
             width: width,
             height: height,
-            text: fragment.text,
-            paragraph: paragraph,
-          ),
-        );
+            config: config,
+          );
+          spans.add(customSpan);
+        } else {
+          spans.add(
+            TextLayoutSpan(
+              x: currentX,
+              y: 0.0,
+              width: width,
+              height: height,
+              text: fragment.text,
+              paragraph: paragraph,
+            ),
+          );
+        }
         currentX += width;
       } else if (fragment is EmojiFragment) {
         final image = atlas.image(fragment.emoji.id);
         if (image == null) continue;
 
-        final width = fragment.emoji.width <= 0 ? config.emojiSize : fragment.emoji.width;
-        final height = fragment.emoji.height <= 0 ? config.emojiSize : fragment.emoji.height;
+        final double width = config.emojiSize;
+        final double height = config.emojiSize;
 
         if (height > maxHeight) maxHeight = height;
 
         final animation = atlas.getAnimation(fragment.emoji.id);
         final player = animation != null ? SpriteAnimationPlayer(animation: animation) : null;
 
-        spans.add(
-          EmojiLayoutSpan(
-            x: currentX,
-            y: 0.0,
-            width: width,
-            height: height,
-            image: image,
-            player: player,
-          ),
-        );
+        spans.add(EmojiLayoutSpan(x: currentX, y: 0.0, width: width, height: height, image: image, player: player));
         currentX += width;
       }
     }
@@ -98,7 +112,7 @@ class MixedLayout {
     for (int i = 0; i < spanLen; i++) {
       final span = spans[i];
       final centeredY = (maxHeight - span.height) / 2.0;
-      
+
       if (span is TextLayoutSpan) {
         spans[i] = TextLayoutSpan(
           x: span.x,
@@ -130,28 +144,10 @@ class MixedLayout {
     }
 
     final builder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: config.fontSize));
-    final multiShadows = const ShadowEffect().createMultiShadows();
-
-    final textStyle = ui.TextStyle(
-      fontSize: config.fontSize,
-      fontWeight: config.fontWeight,
-      color: config.textColor,
-      shadows: multiShadows,
-    );
+    final textStyle = ui.TextStyle(fontSize: config.fontSize, fontWeight: config.fontWeight, color: config.textColor);
 
     builder.pushStyle(textStyle);
     builder.addText(text);
-
-    if (config.showStroke) {
-      final strokePaint = StrokeEffect(strokeColor: config.strokeColor, strokeWidth: 2.0).createStrokePaint();
-      final strokeStyle = ui.TextStyle(
-        foreground: strokePaint,
-        fontSize: config.fontSize,
-        fontWeight: config.fontWeight,
-      );
-      builder.pushStyle(strokeStyle);
-      builder.addText(text);
-    }
 
     final paragraph = builder.build();
     paragraph.layout(ui.ParagraphConstraints(width: double.infinity));

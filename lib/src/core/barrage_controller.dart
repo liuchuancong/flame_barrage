@@ -1,4 +1,3 @@
-import 'barrage_engine.dart';
 import 'package:flame_barrage/flame_barrage.dart';
 
 class BarrageController {

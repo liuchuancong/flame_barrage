@@ -19,15 +19,6 @@ class SpeedStrategy {
       calculatedSpeed *= 1.3;
     }
 
-    if (targetTrack != null) {
-      final last = targetTrack.lastEntry;
-      if (last != null && last.item.type == entry.item.type) {
-        if (calculatedSpeed > last.speed) {
-          calculatedSpeed = last.speed;
-        }
-      }
-    }
-
     if (calculatedSpeed < config.baseSpeed) {
       calculatedSpeed = config.baseSpeed;
     }

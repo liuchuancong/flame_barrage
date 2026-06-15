@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flame_barrage/flame_barrage.dart';
 
 class BarrageConfig {
   const BarrageConfig({
@@ -31,6 +32,11 @@ class BarrageConfig {
     this.normalEmitInterval = 0.15,
     this.massiveEmitInterval = 0.05,
     this.baseSpeed = 120.0,
+    this.barragePoolMaxSize = 150,
+    this.pictureCacheMaxSize = 200,
+    this.textCacheMaxSize = 1000,
+    this.overlapSafeGap = 40.0,
+    this.effectInterceptors = const [],
   });
 
   final double fontSize;
@@ -55,7 +61,6 @@ class BarrageConfig {
   final double trackHeight;
   final double emojiSize;
   final int maxTrackCount;
-
   final int maxTextLength;
   final int maxVisibleCount;
   final int dangerousQueueSize;
@@ -63,6 +68,11 @@ class BarrageConfig {
   final double normalEmitInterval;
   final double massiveEmitInterval;
   final double baseSpeed;
+  final int barragePoolMaxSize;
+  final int pictureCacheMaxSize;
+  final int textCacheMaxSize;
+  final double overlapSafeGap;
+  final List<BarrageEffectInterceptor> effectInterceptors;
 
   int get fixedDurationMs => fixedDuration.inMilliseconds;
 
@@ -96,6 +106,11 @@ class BarrageConfig {
     double? normalEmitInterval,
     double? massiveEmitInterval,
     double? baseSpeed,
+    int? barragePoolMaxSize,
+    int? pictureCacheMaxSize,
+    int? textCacheMaxSize,
+    double? overlapSafeGap,
+    List<BarrageEffectInterceptor>? effectInterceptors,
   }) {
     return BarrageConfig(
       fontSize: fontSize ?? this.fontSize,
@@ -127,6 +142,11 @@ class BarrageConfig {
       normalEmitInterval: normalEmitInterval ?? this.normalEmitInterval,
       massiveEmitInterval: massiveEmitInterval ?? this.massiveEmitInterval,
       baseSpeed: baseSpeed ?? this.baseSpeed,
+      barragePoolMaxSize: barragePoolMaxSize ?? this.barragePoolMaxSize,
+      pictureCacheMaxSize: pictureCacheMaxSize ?? this.pictureCacheMaxSize,
+      textCacheMaxSize: textCacheMaxSize ?? this.textCacheMaxSize,
+      overlapSafeGap: overlapSafeGap ?? this.overlapSafeGap,
+      effectInterceptors: effectInterceptors ?? this.effectInterceptors,
     );
   }
 }

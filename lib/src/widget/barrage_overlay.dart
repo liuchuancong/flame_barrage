@@ -16,13 +16,17 @@ class BarrageOverlay extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTapDown: (TapDownDetails details) {
+        if (onBarrageTap == null) return;
+
         final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
-        if (renderBox == null) return;
+        if (renderBox == null || !renderBox.hasSize) return;
 
         final localPosition = renderBox.globalToLocal(details.globalPosition);
         final activeComponents = engine.children.whereType<BarrageComponent>();
 
         for (final comp in activeComponents) {
+          if (comp.isRemoving || !comp.isMounted) continue;
+
           final double left = comp.position.x;
           final double top = comp.position.y;
           final double right = left + comp.size.x;

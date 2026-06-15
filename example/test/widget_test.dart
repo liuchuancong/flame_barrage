@@ -1,30 +1,95 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flame_barrage/flame_barrage.dart';
 
-import 'package:example/main.dart';
+class MockPicture extends ui.Picture {
+  bool _isDisposed = false;
+
+  @override
+  int get approximateBytesUsed => 0;
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+  }
+
+  @override
+  bool get debugDisposed => _isDisposed;
+
+  @override
+  Future<ui.Image> toImage(int width, int height) {
+    throw UnsupportedError('MockPicture does not support async text-to-image conversion in test environment.');
+  }
+
+  @override
+  ui.Image toImageSync(int width, int height, {ui.TargetPixelFormat targetFormat = ui.TargetPixelFormat.dontCare}) {
+    throw UnsupportedError('MockPicture does not support synchronous text-to-image conversion in test environment.');
+  }
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  group('FlameBarrageWidget & Central Engine Integrations', () {
+    late BarrageConfig baseConfig;
+    late BarrageController controller;
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    setUp(() {
+      baseConfig = const BarrageConfig(trackHeight: 40, maxTrackCount: 5, normalEmitInterval: 0.1, maxVisibleCount: 10);
+      controller = BarrageController();
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    tearDown(() {
+      controller.detach();
+    });
+
+    testWidgets('Should mount FlameBarrageWidget safely inside component tree', (WidgetTester tester) async {
+      await tester.runAsync(() async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 600,
+                child: FlameBarrageWidget(config: baseConfig, emojiAtlas: EmojiAtlas.instance, controller: controller),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(find.byType(FlameBarrageWidget), findsOneWidget);
+      });
+    });
+
+    testWidgets('Should dispatch pipeline from controller to engine safely', (WidgetTester tester) async {
+      await tester.runAsync(() async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 600,
+                child: FlameBarrageWidget(config: baseConfig, emojiAtlas: EmojiAtlas.instance, controller: controller),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(() {
+          controller.send(const BarrageItem(content: 'Pipeline Integration Test Core', type: BarrageType.scroll));
+        }, returnsNormally);
+
+        await tester.pump(const Duration(milliseconds: 200));
+        controller.clear();
+        await tester.pump();
+      });
+    });
   });
 }
