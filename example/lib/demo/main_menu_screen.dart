@@ -61,6 +61,22 @@ class MainMenuScreen extends StatelessWidget {
           ),
           _buildMenuListRow(
             context,
+            icon: Icons.extension_rounded,
+            title: '插件化自定义特效',
+            subtitle: '外部解耦管道自生效机制，自写高级视觉渲染复合效果',
+            route: '/custom_effect',
+            color: const Color(0xFF9254DE),
+          ),
+          _buildMenuListRow(
+            context,
+            icon: Icons.developer_board_rounded,
+            title: '真机显存与常驻内存监控',
+            subtitle: '300发/秒流体洪峰高频轰炸，C++ Picture 指针销毁释放量化观测',
+            route: '/memory',
+            color: const Color(0xFF001529),
+          ),
+          _buildMenuListRow(
+            context,
             icon: Icons.tune_rounded,
             title: '配置主控制中心',
             subtitle: '运行时多维度内核池化限额、流控及防追尾间距深度调节',
