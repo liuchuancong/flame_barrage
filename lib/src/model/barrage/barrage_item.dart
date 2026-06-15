@@ -12,6 +12,10 @@ class BarrageItem {
     this.cachedFragments,
     this.cachedLayout,
     this.cachedPicture,
+    this.onTapDown,
+    this.onLongTapDown,
+    this.onTapUp,
+    this.onTapCancel,
   });
 
   final String content;
@@ -25,4 +29,8 @@ class BarrageItem {
   final LayoutResult? cachedLayout;
 
   final Picture? cachedPicture;
+  final void Function()? onTapDown;
+  final void Function()? onLongTapDown;
+  final void Function()? onTapUp;
+  final void Function()? onTapCancel;
 }

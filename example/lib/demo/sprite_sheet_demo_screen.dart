@@ -26,7 +26,7 @@ class _SpriteSheetDemoScreenState extends State<SpriteSheetDemoScreen> {
       final atlasInfo = const EmojiInfo(
         id: 'css_sprites_atlas',
         keys: ['[表情1]', '[表情2]', '[表情3]', '[表情4]'],
-        asset: 'example/assets/sprites/css_sprites.png',
+        asset: 'assets/sprites/css_sprites.png',
         width: 24,
         height: 24,
         sourceType: EmojiSourceType.atlas,

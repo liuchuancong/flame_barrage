@@ -10,58 +10,41 @@ class BarrageComponent extends PositionComponent with HasGameReference<BarrageEn
   }
 
   static final Paint _opacityPaint = Paint();
-
   BarrageEntry entry;
-
   Picture picture;
-
   Duration fixedDuration;
-
   double opacity = 1.0;
-
   double _lifeTimer = 0.0;
-
   double _fixedDurationSeconds;
 
   void reset({required BarrageEntry newEntry, required Picture newPicture, required Duration newFixedDuration}) {
     entry = newEntry;
     picture = newPicture;
     fixedDuration = newFixedDuration;
-
     _fixedDurationSeconds = newFixedDuration.inMilliseconds / 1000.0;
-
     _lifeTimer = 0.0;
     opacity = 1.0;
-
     size.setValues(newEntry.width, newEntry.height);
-
     position.setValues(newEntry.x, newEntry.y);
   }
 
   @override
   void update(double dt) {
     super.update(dt);
-
     final itemType = entry.item.type;
 
     if (itemType == BarrageType.scroll) {
       final newX = position.x - entry.speed * dt;
-
       position.x = newX;
-
-      // 如果 TrackAllocator 不依赖实时x
-      // 这里可以直接删除
       entry.x = newX;
 
       if (newX + size.x < 0) {
         removeFromParent();
       }
-
       return;
     }
 
     _lifeTimer += dt;
-
     if (_lifeTimer >= _fixedDurationSeconds) {
       removeFromParent();
     }
@@ -70,22 +53,15 @@ class BarrageComponent extends PositionComponent with HasGameReference<BarrageEn
   @override
   void render(Canvas canvas) {
     final currentOpacity = opacity;
-
-    if (currentOpacity <= 0.0) {
-      return;
-    }
-
+    if (currentOpacity <= 0.0) return;
     if (currentOpacity >= 1.0) {
       canvas.drawPicture(picture);
       return;
     }
 
     _opacityPaint.colorFilter = ColorFilter.mode(Color.fromRGBO(0, 0, 0, currentOpacity), BlendMode.dstIn);
-
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.x, size.y), _opacityPaint);
-
     canvas.drawPicture(picture);
-
     canvas.restore();
   }
 
@@ -94,7 +70,6 @@ class BarrageComponent extends PositionComponent with HasGameReference<BarrageEn
     if (game.isMounted) {
       game.recycleComponent(this);
     }
-
     super.onRemove();
   }
 }

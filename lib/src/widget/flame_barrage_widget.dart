@@ -29,6 +29,9 @@ class _FlameBarrageWidgetState extends State<FlameBarrageWidget> {
   @override
   void didUpdateWidget(covariant FlameBarrageWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.config != widget.config) {
+      _engine.updateConfig(widget.config);
+    }
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.detach();
       widget.controller.attach(_engine);
@@ -43,6 +46,8 @@ class _FlameBarrageWidgetState extends State<FlameBarrageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(child: GameWidget(game: _engine));
+    return GameWidget(game: _engine);
   }
+
+  dynamic get engine => _engine;
 }

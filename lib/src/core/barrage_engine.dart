@@ -1,23 +1,11 @@
 import 'dart:ui';
 import 'dart:collection';
 import 'package:flame/game.dart';
-import '../atlas/emoji_atlas.dart';
-import '../pool/barrage_pool.dart';
-import '../layout/rich_parser.dart';
-import '../cache/picture_cache.dart';
-import '../core/barrage_config.dart';
-import '../layout/mixed_layout.dart';
-import '../scheduler/track_manager.dart';
-import '../scheduler/speed_strategy.dart';
-import '../scheduler/track_allocator.dart';
-import '../model/barrage/barrage_item.dart';
-import '../model/barrage/barrage_type.dart';
-import '../model/barrage/barrage_entry.dart';
-import '../render/barrage/mixed_renderer.dart';
+import 'package:flame/events.dart';
+import 'package:flame_barrage/flame_barrage.dart';
 import 'package:flutter/material.dart' show Colors;
-import 'package:flame_barrage/src/components/barrage_component.dart';
 
-class BarrageEngine extends FlameGame {
+class BarrageEngine extends FlameGame with TapCallbacks {
   BarrageEngine({required BarrageConfig config, required this.emojiAtlas})
     : _config = config,
       _pictureCache = PictureCache(maxSize: config.pictureCacheMaxSize),
@@ -48,6 +36,59 @@ class BarrageEngine extends FlameGame {
   double _metricTimer = 0.0;
   bool _massiveMode = false;
   bool _initialized = false;
+
+  BarrageComponent? _hitTestActiveComponents(Offset localPos) {
+    final int len = _activeComponentCache.length;
+    for (int i = len - 1; i >= 0; i--) {
+      final comp = _activeComponentCache[i];
+      if (comp.isRemoving || !comp.isMounted) continue;
+
+      final double left = comp.position.x;
+      final double top = comp.position.y;
+      final double right = left + comp.size.x;
+      final double bottom = top + comp.size.y;
+
+      if (localPos.dx >= left && localPos.dx <= right && localPos.dy >= top && localPos.dy <= bottom) {
+        return comp;
+      }
+    }
+    return null;
+  }
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    final comp = _hitTestActiveComponents(Offset(event.localPosition.x, event.localPosition.y));
+    if (comp != null) {
+      event.handled = true;
+      comp.entry.item.onTapDown?.call();
+    }
+  }
+
+  @override
+  void onLongTapDown(TapDownEvent event) {
+    final comp = _hitTestActiveComponents(Offset(event.localPosition.x, event.localPosition.y));
+    if (comp != null) {
+      event.handled = true;
+      comp.entry.item.onLongTapDown?.call();
+    }
+  }
+
+  @override
+  void onTapUp(TapUpEvent event) {
+    final comp = _hitTestActiveComponents(Offset(event.localPosition.x, event.localPosition.y));
+    if (comp != null) {
+      event.handled = true;
+      comp.entry.item.onTapUp?.call();
+    }
+  }
+
+  @override
+  void onTapCancel(TapCancelEvent event) {
+    final int len = _activeComponentCache.length;
+    for (int i = 0; i < len; i++) {
+      _activeComponentCache[i].entry.item.onTapCancel?.call();
+    }
+  }
 
   @override
   Color backgroundColor() => Colors.transparent;

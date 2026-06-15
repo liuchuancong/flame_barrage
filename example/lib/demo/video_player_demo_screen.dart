@@ -11,110 +11,58 @@ class VideoPlayerDemoScreen extends StatefulWidget {
 
 class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
   final BarrageController _controller = BarrageController();
-  final GlobalKey _barrageWidgetKey = GlobalKey();
+  final List<String> _gestureConsoleLogs = [];
+  final ScrollController _consoleScrollController = ScrollController();
 
   @override
   void dispose() {
     _controller.detach();
+    _consoleScrollController.dispose();
     super.dispose();
   }
 
-  void _injectMockBarrages() {
+  void _logGestureEvent(String message) {
+    setState(() {
+      _gestureConsoleLogs.add('[${DateTime.now().toString().split(' ').last}] $message');
+      if (_gestureConsoleLogs.length > 50) {
+        _gestureConsoleLogs.removeAt(0);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_consoleScrollController.hasClients) {
+        _consoleScrollController.jumpTo(_consoleScrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  void _injectStressTestBarrages() {
     final items = [
-      const BarrageItem(content: '这是一条可以点击的弹幕 👍', type: BarrageType.scroll, priority: 1),
-      const BarrageItem(content: '点击我可以触发弹窗互动 🌟', type: BarrageType.scroll, priority: 1),
-      const BarrageItem(content: '哈哈哈哈红红火火恍恍惚惚', type: BarrageType.scroll, priority: 0),
-    ];
-    for (var item in items) {
-      _controller.send(item);
-    }
-  }
-
-  void _handleCanvasTap(TapDownDetails details) {
-    final dynamic dynamicController = _controller;
-
-    dynamic engine;
-    try {
-      if (dynamicController.engine != null) {
-        engine = dynamicController.engine;
-      }
-    } catch (_) {
-      try {
-        if (dynamicController.context?.engine != null) {
-          engine = dynamicController.context.engine;
-        }
-      } catch (_) {}
-    }
-
-    if (engine == null) return;
-
-    final RenderBox? renderBox = _barrageWidgetKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null || !renderBox.hasSize) return;
-
-    final localPosition = renderBox.globalToLocal(details.globalPosition);
-
-    try {
-      final List<dynamic> activeEntries = engine._activeEntries as List<dynamic>;
-      final int len = activeEntries.length;
-
-      for (int i = len - 1; i >= 0; i--) {
-        final dynamic entry = activeEntries[i];
-
-        final double left = entry.x as double;
-        final double top = entry.y as double;
-        final double right = left + (entry.width as double);
-        final double bottom = top + (entry.height as double);
-
-        if (localPosition.dx >= left &&
-            localPosition.dx <= right &&
-            localPosition.dy >= top &&
-            localPosition.dy <= bottom) {
-          final String content = entry.item.content as String;
-          _showInteractionSheet(content);
-          break;
-        }
-      }
-    } catch (e) {
-      debugPrint('手势撞击矩阵计算异常: $e');
-    }
-  }
-
-  void _showInteractionSheet(String content) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: SafeArea(
-          child: Wrap(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  '已命中弹幕: "$content"',
-                  style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500),
-                ),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.favorite_rounded, color: Colors.redAccent),
-                title: const Text('为该弹幕点赞'),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.report_gmailerrorred_rounded, color: Colors.orangeAccent),
-                title: const Text('举报不良内容'),
-                onTap: () => Navigator.pop(context),
-              ),
-              const SizedBox(height: 12),
-            ],
-          ),
-        ),
+      BarrageItem(
+        content: '⚡ 点击按下测试弹幕 ⚡',
+        type: BarrageType.scroll,
+        priority: 1,
+        onTapDown: () => _logGestureEvent('【onTapDown】击中目标文字！'),
+        onTapUp: () => _logGestureEvent('【onTapUp】鼠标顺利抬起释放'),
+        onLongTapDown: () => _logGestureEvent('【onLongTapDown】触发高能长按！'),
+        onTapCancel: () => _logGestureEvent('【onTapCancel】触控判定移出被取消'),
       ),
-    );
+      BarrageItem(
+        content: '🔥 连续多手势联合并发轰炸 🔥',
+        type: BarrageType.scroll,
+        priority: 1,
+        onTapDown: () => _logGestureEvent('【onTapDown】高并发触发'),
+        onTapUp: () => _logGestureEvent('【onTapUp】释放总线'),
+        onLongTapDown: () => _logGestureEvent('【onLongTapDown】长按蓄力中...'),
+        onTapCancel: () => _logGestureEvent('【onTapCancel】判定拦截撤销'),
+      ),
+      const BarrageItem(content: '背景杂音普通不响应点击弹幕 666', type: BarrageType.scroll, priority: 0),
+    ];
+
+    for (int i = 0; i < 4; i++) {
+      for (var item in items) {
+        _controller.send(item);
+      }
+    }
   }
 
   @override
@@ -125,7 +73,7 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         title: const Text(
-          '交互式视频手势遮罩',
+          '4大底层手势流联合压测',
           style: TextStyle(color: Color(0xFF1F2328), fontWeight: FontWeight.bold, fontSize: 17),
         ),
         centerTitle: true,
@@ -152,15 +100,10 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
                 children: [
                   const Center(child: Icon(Icons.play_circle_filled_rounded, size: 54, color: Colors.white60)),
                   Positioned.fill(
-                    child: GestureDetector(
-                      key: _barrageWidgetKey,
-                      behavior: HitTestBehavior.opaque,
-                      onTapDown: _handleCanvasTap,
-                      child: FlameBarrageWidget(
-                        config: BarrageRouter.globalConfig.copyWith(area: 0.7),
-                        emojiAtlas: EmojiAtlas.instance,
-                        controller: _controller,
-                      ),
+                    child: FlameBarrageWidget(
+                      config: BarrageRouter.globalConfig.copyWith(area: 0.7),
+                      emojiAtlas: EmojiAtlas.instance,
+                      controller: _controller,
                     ),
                   ),
                   Positioned(
@@ -185,15 +128,15 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
                             child: Padding(
                               padding: EdgeInsets.symmetric(horizontal: 12.0),
                               child: LinearProgressIndicator(
-                                value: 0.35,
+                                value: 0.45,
                                 backgroundColor: Colors.white24,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.purpleAccent),
                                 minHeight: 3,
                               ),
                             ),
                           ),
                           Text(
-                            '03:15 / 09:42',
+                            '04:20 / 11:15',
                             style: TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'monospace'),
                           ),
                         ],
@@ -205,18 +148,18 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 4.0),
             child: Container(
               width: double.infinity,
-              height: 52,
+              height: 50,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF1890FF), Color(0xFF0050B3)]),
-                borderRadius: BorderRadius.circular(26),
+                gradient: const LinearGradient(colors: [Color(0xFF722ED1), Color(0xFF391085)]),
+                borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF1890FF).withValues(alpha: 0.25),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
+                    color: const Color(0xFF722ED1).withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -224,29 +167,77 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                 ),
-                onPressed: _injectMockBarrages,
-                icon: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 18),
+                onPressed: _injectStressTestBarrages,
+                icon: const Icon(Icons.bolt, color: Colors.white, size: 18),
                 label: const Text(
-                  '发射可交互矩阵检测弹幕',
-                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                  '注入4重手势高频测试弹幕',
+                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
           ),
-          const Expanded(
-            child: Padding(
-              padding: EdgeInsets.all(32.0),
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white10),
+              ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.ads_click_rounded, color: Color(0xFF8C95A0), size: 36),
-                  SizedBox(height: 12),
-                  Text(
-                    '点击说明: 发射弹幕后，请直接在黑色播放器画面内，用鼠标精准点击正在从右向左滑动的文字。基于纯数据级反向矩阵转换，弹窗将即刻弹出。',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFF57606A), fontSize: 12, height: 1.4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.terminal_rounded, color: Colors.greenAccent, size: 16),
+                          SizedBox(width: 6),
+                          Text(
+                            '手势总线实时捕获控制台',
+                            style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      TextButton(
+                        onPressed: () => setState(() => _gestureConsoleLogs.clear()),
+                        child: const Text('清空日志', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Colors.white10, height: 1),
+                  Expanded(
+                    child: _gestureConsoleLogs.isEmpty
+                        ? const Center(
+                            child: Text(
+                              '暂无手势触发，请用鼠标点击或长按上方滑出的【⚡】或【🔥】弹幕文字',
+                              style: TextStyle(color: Colors.white30, fontSize: 11),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: _consoleScrollController,
+                            itemCount: _gestureConsoleLogs.length,
+                            itemBuilder: (context, index) {
+                              final log = _gestureConsoleLogs[index];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                child: Text(
+                                  log,
+                                  style: const TextStyle(
+                                    color: Colors.greenAccent,
+                                    fontFamily: 'monospace',
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
