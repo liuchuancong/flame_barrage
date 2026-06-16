@@ -1,8 +1,15 @@
 name: flame_barrage
-description: A high-performance live broadcast barrage plugin based on Flame engine.
+description: A high-performance barrage rendering engine powered by Flame.
 version: 0.0.1
-homepage: https://github.com/liuchuancong/flame_barrage
-
+homepage: https://github.com/yourname/flame_barrage
+repository: https://github.com/yourname/flame_barrage
+issue_tracker: https://github.com/yourname/flame_barrage/issues
+topics:
+  - barrage
+  - danmaku
+  - flame
+  - flutter
+  - live-stream
 environment:
   sdk: ^3.12.0
   flutter: ">=1.17.0"
