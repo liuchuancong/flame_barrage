@@ -162,7 +162,7 @@ class VipRainbowTextLayoutSpan extends TextLayoutSpan {
 
     final strokePaint = ui.Paint()
       ..style = ui.PaintingStyle.stroke
-      ..strokeWidth = 3.0
+      ..strokeWidth = config.strokeWidth
       ..color = const ui.Color(0xFF000000)
       ..isAntiAlias = true;
 

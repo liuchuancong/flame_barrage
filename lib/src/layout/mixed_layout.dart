@@ -55,7 +55,12 @@ class MixedLayout {
 
       if (fragment is TextFragment) {
         final textCacheKey = '${fragment.text}|$fontSize|$colorValue|$showStroke';
-        final paragraph = _buildParagraph(fragment.text, config, textCacheKey);
+        final strokeCacheKey = '${fragment.text}|$fontSize|${config.strokeColor.toARGB32()}|$showStroke';
+
+        final paragraph = _buildParagraph(fragment.text, config, textCacheKey, isStroke: false);
+        final strokeParagraph = config.showStroke
+            ? _buildParagraph(fragment.text, config, strokeCacheKey, isStroke: true)
+            : null;
 
         final width = paragraph.maxIntrinsicWidth;
         final height = paragraph.height;
@@ -91,6 +96,7 @@ class MixedLayout {
               height: height,
               text: fragment.text,
               paragraph: paragraph,
+              strokeParagraph: strokeParagraph,
             ),
           );
         }
@@ -139,7 +145,6 @@ class MixedLayout {
       final span = _reusableSpans[index];
       final centeredY = (maxHeight - span.height) / 2.0;
 
-      // 核心修复点：完美利用多态性尝试强转并调用动态克隆方法，100% 绕开且解决 final 只读属性赋值死锁！
       if (span.runtimeType != TextLayoutSpan && span is TextLayoutSpan) {
         try {
           return (span as dynamic).copyWithY(centeredY) as LayoutSpan;
@@ -154,6 +159,7 @@ class MixedLayout {
           height: span.height,
           text: span.text,
           paragraph: span.paragraph,
+          strokeParagraph: span.strokeParagraph,
         );
       } else if (span is SpriteLayoutSpan) {
         return SpriteLayoutSpan(
@@ -179,17 +185,34 @@ class MixedLayout {
     return LayoutResult(width: currentX, height: maxHeight, spans: finalSpans, cacheKey: combinedHash.toString());
   }
 
-  ui.Paragraph _buildParagraph(String text, BarrageConfig config, String textCacheKey) {
+  ui.Paragraph _buildParagraph(String text, BarrageConfig config, String textCacheKey, {required bool isStroke}) {
     final cached = _textCache.get(textCacheKey);
     if (cached != null) {
       return cached;
     }
 
     final builder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: config.fontSize, height: 1.0));
-    final textStyle = ui.TextStyle(fontSize: config.fontSize, fontWeight: config.fontWeight, color: config.textColor);
 
-    builder.pushStyle(textStyle);
+    if (isStroke) {
+      final strokePaint = ui.Paint()
+        ..style = ui.PaintingStyle.stroke
+        ..strokeWidth = config.strokeWidth
+        ..color = config.strokeColor
+        ..isAntiAlias = true;
+
+      builder.pushStyle(
+        ui.TextStyle(foreground: strokePaint, fontSize: config.fontSize, fontWeight: config.fontWeight),
+      );
+    } else {
+      final textPaint = ui.Paint()
+        ..color = config.textColor
+        ..isAntiAlias = true;
+
+      builder.pushStyle(ui.TextStyle(foreground: textPaint, fontSize: config.fontSize, fontWeight: config.fontWeight));
+    }
+
     builder.addText(text);
+    builder.pop();
 
     final paragraph = builder.build();
     paragraph.layout(ui.ParagraphConstraints(width: double.infinity));
@@ -205,6 +228,8 @@ class MixedLayout {
     hash = 37 * hash + config.textColor.toARGB32().hashCode;
     hash = 37 * hash + config.emojiSize.hashCode;
     hash = 37 * hash + priority.hashCode;
+    hash = 37 * hash + config.showStroke.hashCode;
+    hash = 37 * hash + config.strokeColor.toARGB32().hashCode;
 
     final len = fragments.length;
     for (int i = 0; i < len; i++) {

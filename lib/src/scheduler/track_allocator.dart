@@ -27,21 +27,8 @@ class TrackAllocator {
 
       final last = track.lastEntry;
       if (last != null) {
-        final double lastRight = track.lastRight;
-        if (lastRight + config.overlapSafeGap > screenWidth) {
+        if (last.x + last.width + config.overlapSafeGap > screenWidth) {
           continue;
-        }
-
-        final double currentSpeed = config.baseSpeed;
-        if (currentSpeed > last.speed) {
-          final double lastTailX = lastRight;
-          final double catchUpDistance = screenWidth - lastTailX;
-          final double catchUpTime = catchUpDistance / (currentSpeed - last.speed);
-          final double lastRemainingTime = lastTailX / last.speed;
-
-          if (catchUpTime < lastRemainingTime) {
-            continue;
-          }
         }
       }
 

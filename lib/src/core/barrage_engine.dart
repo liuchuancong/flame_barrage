@@ -2,8 +2,19 @@ import 'dart:ui';
 import 'dart:collection';
 import 'package:flame/game.dart';
 import 'package:flame/events.dart';
-import 'package:flame_barrage/flame_barrage.dart';
-import 'package:flutter/material.dart' show Colors;
+import '../atlas/emoji_atlas.dart';
+import '../pool/barrage_pool.dart';
+import '../layout/rich_parser.dart';
+import '../cache/picture_cache.dart';
+import '../core/barrage_config.dart';
+import '../layout/mixed_layout.dart';
+import '../scheduler/track_manager.dart';
+import '../scheduler/track_allocator.dart';
+import '../model/barrage/barrage_item.dart';
+import '../model/barrage/barrage_type.dart';
+import '../model/barrage/barrage_entry.dart';
+import '../render/barrage/mixed_renderer.dart';
+import 'package:flutter/material.dart' show Colors, BuildContext, MediaQuery;
 
 class BarrageEngine extends FlameGame with TapCallbacks {
   BarrageEngine({required BarrageConfig config, required this.emojiAtlas})
@@ -26,14 +37,11 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   final PictureCache _pictureCache;
   final TrackManager _trackManager = TrackManager();
   final TrackAllocator _trackAllocator = const TrackAllocator();
-  final SpeedStrategy _speedStrategy = const SpeedStrategy();
   final BarragePool _pool;
 
   final Queue<BarrageItem> _waiting = Queue<BarrageItem>();
   List<BarrageEntry> _activeEntries = [];
   List<BarrageEntry> _backbufferEntries = [];
-  int get activeCacheSize => _pictureCache.size;
-  int get activePoolSize => _pool.currentSize;
 
   int _currentAliveCount = 0;
 
@@ -41,6 +49,37 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   double _metricTimer = 0.0;
   double _cleanupTimer = 0.0;
   bool _initialized = false;
+
+  double _calculateAllowedHeight(double rawHeight) {
+    final BuildContext? ctx = buildContext;
+    double topInset = 0.0;
+    double bottomInset = 0.0;
+    if (ctx != null && _config.safeArea) {
+      topInset = MediaQuery.paddingOf(ctx).top;
+      bottomInset = MediaQuery.paddingOf(ctx).bottom;
+    }
+    final double finalTop = topInset + _config.topAreaDistance;
+    final double finalBottom = bottomInset + _config.bottomAreaDistance;
+    return (rawHeight * _config.area) - finalTop - finalBottom;
+  }
+
+  double _getTopOffset() {
+    final BuildContext? ctx = buildContext;
+    double topInset = 0.0;
+    if (ctx != null && _config.safeArea) {
+      topInset = MediaQuery.paddingOf(ctx).top;
+    }
+    return topInset + _config.topAreaDistance;
+  }
+
+  double _getBottomOffset() {
+    final BuildContext? ctx = buildContext;
+    double bottomInset = 0.0;
+    if (ctx != null && _config.safeArea) {
+      bottomInset = MediaQuery.paddingOf(ctx).bottom;
+    }
+    return bottomInset + _config.bottomAreaDistance;
+  }
 
   @override
   void onTapDown(TapDownEvent event) {
@@ -119,21 +158,21 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     _pictureCache.updateMaxSize(newConfig.pictureCacheMaxSize);
     _pool.updateMaxSize(newConfig.barragePoolMaxSize);
     if (_initialized) {
-      _trackManager.initialize(_config, size.y);
+      _trackManager.initialize(_config, _calculateAllowedHeight(size.y));
     }
   }
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    _trackManager.initialize(_config, size.y);
+    _trackManager.initialize(_config, _calculateAllowedHeight(size.y));
     _initialized = true;
   }
 
   @override
   void onGameResize(Vector2 size) {
     super.onGameResize(size);
-    _trackManager.initialize(_config, size.y);
+    _trackManager.initialize(_config, _calculateAllowedHeight(size.y));
     _initialized = true;
   }
 
@@ -160,7 +199,9 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       if (!entry.active) continue;
 
       if (entry.item.type == BarrageType.scroll) {
-        entry.x -= entry.speed * dt;
+        // 终极绝杀：直接让单帧物理运动方程，垂直、高频直刷去吃最新的 _config.baseSpeed 配置超参！
+        // 彻底破除因属性录制锁死引发的移速不动态联动大黑洞，新老弹幕在视口里原地实现极致平滑变速滑行！
+        entry.x -= _config.baseSpeed * dt;
         if (entry.x + entry.width < 0) {
           entry.active = false;
         }
@@ -206,7 +247,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
 
     if (_currentAliveCount >= _config.maxVisibleCount) return;
 
-    _trackManager.initialize(_config, size.y);
+    _trackManager.initialize(_config, _calculateAllowedHeight(size.y));
     if (_trackManager.tracks.isEmpty) return;
 
     final item = _waiting.first;
@@ -215,8 +256,9 @@ class BarrageEngine extends FlameGame with TapCallbacks {
 
     final mockEntry = _pool.obtain(item: item, creationTime: DateTime.now().millisecondsSinceEpoch)
       ..width = layoutResult.width
-      ..height = layoutResult.height
-      ..speed = item.type == BarrageType.scroll ? 100.0 : 0.0;
+      ..height = layoutResult.height;
+
+    mockEntry.speed = item.type == BarrageType.scroll ? _config.baseSpeed : 0.0;
 
     final trackIndex = _trackAllocator.allocate(
       tracks: _trackManager.tracks,
@@ -236,7 +278,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     final now = DateTime.now().millisecondsSinceEpoch;
     track.lastLaunchTime = now;
 
-    final cacheKey = _buildCacheKey(item);
+    final cacheKey = buildCacheKey(item);
     Picture? picture = _pictureCache.get(cacheKey);
     if (picture == null) {
       picture = _renderer.buildPicture(layoutResult);
@@ -244,13 +286,18 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     }
 
     double startX = size.x;
-    double startY = trackIndex * _config.trackHeight + (_config.trackHeight - layoutResult.height) / 2;
+    double startY =
+        _getTopOffset() + (trackIndex * _config.trackHeight) + (_config.trackHeight - layoutResult.height) / 2;
 
     if (item.type != BarrageType.scroll) {
       track.locked = true;
       startX = (size.x - layoutResult.width) / 2;
       if (item.type == BarrageType.bottomFixed) {
-        startY = size.y - (trackIndex + 1) * _config.trackHeight + (_config.trackHeight - layoutResult.height) / 2;
+        startY =
+            size.y -
+            _getBottomOffset() -
+            ((trackIndex + 1) * _config.trackHeight) +
+            (_config.trackHeight - layoutResult.height) / 2;
       }
     }
 
@@ -259,10 +306,6 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     mockEntry.y = startY;
     mockEntry.picture = picture;
     mockEntry.active = true;
-
-    mockEntry.speed = item.type == BarrageType.scroll
-        ? _speedStrategy.calculate(mockEntry, size.x, _config, targetTrack: track)
-        : 0.0;
 
     track.lastRight = startX + layoutResult.width;
     track.lastEntry = mockEntry;
@@ -292,11 +335,9 @@ class BarrageEngine extends FlameGame with TapCallbacks {
           }
         }
       }
-
       track.activeCount = count;
       track.avgSpeed = count == 0 ? 0.0 : totalSpeed / count;
       track.density = size.x > 0 ? (count * 150.0) / size.x : 0.0;
-
       if (youngestEntry != null) {
         track.lastRight = youngestEntry.x + youngestEntry.width;
         track.lastEntry = youngestEntry;
@@ -322,15 +363,32 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   void render(Canvas canvas) {
     super.render(canvas);
     if (!_initialized) return;
-
+    final double globalOpacity = _config.opacity.clamp(0.0, 1.0);
     final int len = _activeEntries.length;
-    for (int i = 0; i < len; i++) {
-      final entry = _activeEntries[i];
-      if (!entry.active || entry.picture == null) continue;
-      canvas.save();
-      canvas.translate(entry.x, entry.y);
-      canvas.drawPicture(entry.picture!);
-      canvas.restore();
+    if (globalOpacity >= 1.0) {
+      for (int i = 0; i < len; i++) {
+        final entry = _activeEntries[i];
+        if (!entry.active || entry.picture == null) continue;
+        canvas.save();
+        canvas.translate(entry.x, entry.y);
+        canvas.drawPicture(entry.picture!);
+        canvas.restore();
+      }
+    } else {
+      final opacityPaint = Paint()
+        ..color = const Color(0xFFFFFFFF).withValues(alpha: globalOpacity)
+        ..isAntiAlias = true;
+      for (int i = 0; i < len; i++) {
+        final entry = _activeEntries[i];
+        if (!entry.active || entry.picture == null) continue;
+        canvas.save();
+        canvas.translate(entry.x, entry.y);
+        final bounds = Rect.fromLTWH(0, 0, entry.width, entry.height);
+        canvas.saveLayer(bounds, opacityPaint);
+        canvas.drawPicture(entry.picture!);
+        canvas.restore();
+        canvas.restore();
+      }
     }
   }
 
@@ -352,15 +410,8 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     }
   }
 
-  String _buildCacheKey(BarrageItem item) {
-    return [
-      item.content,
-      item.type.name,
-      _config.fontSize,
-      _config.fontWeight.toString(),
-      _config.textColor.toARGB32(),
-      config.emojiSize,
-    ].join('');
+  String buildCacheKey(BarrageItem item) {
+    return [item.content, item.type.name].join('');
   }
 
   @override
@@ -377,4 +428,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     _currentAliveCount = 0;
     super.onRemove();
   }
+
+  int get activeCacheSize => _pictureCache.size;
+  int get activePoolSize => _pool.currentSize;
 }

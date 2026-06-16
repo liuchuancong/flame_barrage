@@ -16,9 +16,6 @@ class BarrageConfig {
     this.bottomAreaDistance = 0,
     this.scrollDuration = const Duration(seconds: 8),
     this.fixedDuration = const Duration(seconds: 4),
-    this.hideTop = false,
-    this.hideBottom = false,
-    this.hideScroll = false,
     this.safeArea = true,
     this.fps = 60,
     this.trackHeight = 36,
@@ -26,6 +23,7 @@ class BarrageConfig {
     this.maxVisibleCount = 80,
     this.emitInterval = 0.1,
     this.baseSpeed = 120.0,
+    this.strokeWidth = 1.0,
     this.overlapSafeGap = 40.0,
     this.noEmojiMode = false,
     this.barragePoolMaxSize = 150,
@@ -45,6 +43,8 @@ class BarrageConfig {
 
   /// The edge boundary outline color utilized for anti-invisible rendering.
   final Color strokeColor;
+
+  final double strokeWidth;
 
   /// The default opacity level (alpha scale) for active view elements (0.0 to 1.0).
   final double opacity;
@@ -66,15 +66,6 @@ class BarrageConfig {
 
   /// Total presentation lifetime duration allowed for fixed top and bottom barrages.
   final Duration fixedDuration;
-
-  /// Blacklist filter to instantly cull, drop, and reject top-fixed items.
-  final bool hideTop;
-
-  /// Blacklist filter to instantly cull, drop, and reject bottom-fixed items.
-  final bool hideBottom;
-
-  /// Blacklist filter to instantly cull, drop, and reject scrolling text tracks.
-  final bool hideScroll;
 
   /// Automatically adjusts allocation vertical layout based on device safe insets.
   final bool safeArea;
@@ -125,6 +116,7 @@ class BarrageConfig {
     Color? strokeColor,
     double? opacity,
     bool? showStroke,
+    double? strokeWidth,
     double? area,
     double? topAreaDistance,
     double? bottomAreaDistance,
@@ -154,14 +146,12 @@ class BarrageConfig {
       strokeColor: strokeColor ?? this.strokeColor,
       opacity: opacity ?? this.opacity,
       showStroke: showStroke ?? this.showStroke,
+      strokeWidth: strokeWidth ?? this.strokeWidth,
       area: area ?? this.area,
       topAreaDistance: topAreaDistance ?? this.topAreaDistance,
       bottomAreaDistance: bottomAreaDistance ?? this.bottomAreaDistance,
       scrollDuration: scrollDuration ?? this.scrollDuration,
       fixedDuration: fixedDuration ?? this.fixedDuration,
-      hideTop: hideTop ?? this.hideTop,
-      hideBottom: hideBottom ?? this.hideBottom,
-      hideScroll: hideScroll ?? this.hideScroll,
       safeArea: safeArea ?? this.safeArea,
       fps: fps ?? this.fps,
       trackHeight: trackHeight ?? this.trackHeight,
@@ -176,5 +166,64 @@ class BarrageConfig {
       textCacheMaxSize: textCacheMaxSize ?? this.textCacheMaxSize,
       effectInterceptors: effectInterceptors ?? this.effectInterceptors,
     );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is BarrageConfig &&
+        other.fontSize == fontSize &&
+        other.fontWeight == fontWeight &&
+        other.textColor == textColor &&
+        other.strokeColor == strokeColor &&
+        other.opacity == opacity &&
+        other.showStroke == showStroke &&
+        other.strokeWidth == strokeWidth &&
+        other.area == area &&
+        other.topAreaDistance == topAreaDistance &&
+        other.bottomAreaDistance == bottomAreaDistance &&
+        other.safeArea == safeArea &&
+        other.scrollDuration == scrollDuration &&
+        other.fixedDuration == fixedDuration &&
+        other.fps == fps &&
+        other.trackHeight == trackHeight &&
+        other.emojiSize == emojiSize &&
+        other.maxVisibleCount == maxVisibleCount &&
+        other.emitInterval == emitInterval &&
+        other.baseSpeed == baseSpeed &&
+        other.overlapSafeGap == overlapSafeGap &&
+        other.noEmojiMode == noEmojiMode &&
+        other.barragePoolMaxSize == barragePoolMaxSize &&
+        other.pictureCacheMaxSize == pictureCacheMaxSize &&
+        other.textCacheMaxSize == textCacheMaxSize;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hashAll([
+      fontSize,
+      fontWeight,
+      textColor,
+      strokeColor,
+      opacity,
+      showStroke,
+      strokeWidth,
+      area,
+      topAreaDistance,
+      bottomAreaDistance,
+      safeArea,
+      scrollDuration,
+      fixedDuration,
+      fps,
+      trackHeight,
+      emojiSize,
+      maxVisibleCount,
+      emitInterval,
+      overlapSafeGap,
+      noEmojiMode,
+      barragePoolMaxSize,
+      pictureCacheMaxSize,
+      textCacheMaxSize,
+    ]);
   }
 }

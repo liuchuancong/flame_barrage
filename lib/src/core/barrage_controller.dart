@@ -38,6 +38,12 @@ class BarrageController {
     _preInitQueue.clear();
   }
 
+  void updateConfig(BarrageConfig newConfig) {
+    if (_engine != null) {
+      _engine!.updateConfig(newConfig);
+    }
+  }
+
   int get totalEmitted => _totalEmittedCount;
 
   int get pictureCacheCount {
