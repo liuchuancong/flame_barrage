@@ -12,7 +12,6 @@ class CustomEffectDemoScreen extends StatefulWidget {
 class _CustomEffectDemoScreenState extends State<CustomEffectDemoScreen> {
   final BarrageController _controller = BarrageController();
   final TextEditingController _textController = TextEditingController();
-
   late final BarrageConfig _config;
 
   @override
@@ -124,7 +123,7 @@ class VipRainbowInterceptor extends BarrageEffectInterceptor {
 }
 
 class VipRainbowTextLayoutSpan extends TextLayoutSpan {
-  VipRainbowTextLayoutSpan({
+  const VipRainbowTextLayoutSpan({
     required super.x,
     required super.y,
     required super.width,
@@ -136,16 +135,26 @@ class VipRainbowTextLayoutSpan extends TextLayoutSpan {
 
   final BarrageConfig config;
 
+  VipRainbowTextLayoutSpan copyWithY(double newY) {
+    return VipRainbowTextLayoutSpan(
+      x: x,
+      y: newY,
+      width: width,
+      height: height,
+      text: text,
+      paragraph: paragraph,
+      config: config,
+    );
+  }
+
   @override
   void paint(ui.Canvas canvas) {
-    final gradientShader = ui.Gradient.linear(ui.Offset(x, y), ui.Offset(x + width, y), const [
-      Colors.red,
-      Colors.orange,
-      Colors.yellow,
-      Colors.green,
-      Colors.cyan,
-      Colors.purple,
-    ]);
+    final gradientShader = ui.Gradient.linear(
+      ui.Offset(x, y),
+      ui.Offset(x + width, y),
+      const [Colors.red, Colors.orange, Colors.yellow, Colors.green, Colors.cyan, Colors.purple],
+      const [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+    );
 
     final textPaint = ui.Paint()
       ..shader = gradientShader
@@ -162,9 +171,7 @@ class VipRainbowTextLayoutSpan extends TextLayoutSpan {
       ..addText(text);
 
     final strokeParagraph = builder.build()..layout(ui.ParagraphConstraints(width: width + 6.0));
-
     final offsets = const [ui.Offset(-1.0, -1.0), ui.Offset(1.0, -1.0), ui.Offset(-1.0, 1.0), ui.Offset(1.0, 1.0)];
-
     final origin = ui.Offset(x, y);
 
     for (int i = 0; i < 4; i++) {
@@ -176,7 +183,6 @@ class VipRainbowTextLayoutSpan extends TextLayoutSpan {
       ..addText(text);
 
     final fillParagraph = fillBuilder.build()..layout(ui.ParagraphConstraints(width: width));
-
     canvas.drawParagraph(fillParagraph, origin);
   }
 }

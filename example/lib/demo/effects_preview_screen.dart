@@ -12,7 +12,6 @@ class EffectsPreviewScreen extends StatefulWidget {
 class _EffectsPreviewScreenState extends State<EffectsPreviewScreen> {
   final BarrageController _controller = BarrageController();
   final TextEditingController _textController = TextEditingController();
-
   late final BarrageConfig _config;
 
   @override
@@ -101,7 +100,7 @@ class _EffectsPreviewScreenState extends State<EffectsPreviewScreen> {
                         label: const Text('立体阴影'),
                       ),
                       ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.amber[800]),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
                         onPressed: () => _sendEffectBarrage('霓虹发光'),
                         icon: const Icon(Icons.lightbulb, size: 16),
                         label: const Text('霓虹发光'),
@@ -168,7 +167,7 @@ class StrokeInterceptor extends BarrageEffectInterceptor {
 }
 
 class PreviewStrokeSpan extends TextLayoutSpan {
-  PreviewStrokeSpan({
+  const PreviewStrokeSpan({
     required super.x,
     required super.y,
     required super.width,
@@ -177,7 +176,21 @@ class PreviewStrokeSpan extends TextLayoutSpan {
     required super.paragraph,
     required this.config,
   });
+
   final BarrageConfig config;
+
+  PreviewStrokeSpan copyWithY(double newY) {
+    return PreviewStrokeSpan(
+      x: x,
+      y: newY,
+      width: width,
+      height: height,
+      text: text,
+      paragraph: paragraph,
+      config: config,
+    );
+  }
+
   @override
   void paint(ui.Canvas canvas) {
     final strokePaint = StrokeEffect(strokeColor: config.strokeColor, strokeWidth: 3.0).createStrokePaint();
@@ -189,7 +202,11 @@ class PreviewStrokeSpan extends TextLayoutSpan {
     for (int i = 0; i < 4; i++) {
       canvas.drawParagraph(strokeParagraph, ui.Offset(x, y) + offsets[i] * 0.5);
     }
-    super.paint(canvas);
+    final fillBuilder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: config.fontSize))
+      ..pushStyle(ui.TextStyle(color: Colors.white, fontSize: config.fontSize, fontWeight: config.fontWeight))
+      ..addText(text);
+    final fillParagraph = fillBuilder.build()..layout(ui.ParagraphConstraints(width: width));
+    canvas.drawParagraph(fillParagraph, ui.Offset(x, y));
   }
 }
 
@@ -221,7 +238,7 @@ class ShadowInterceptor extends BarrageEffectInterceptor {
 }
 
 class PreviewShadowSpan extends TextLayoutSpan {
-  PreviewShadowSpan({
+  const PreviewShadowSpan({
     required super.x,
     required super.y,
     required super.width,
@@ -230,7 +247,21 @@ class PreviewShadowSpan extends TextLayoutSpan {
     required super.paragraph,
     required this.config,
   });
+
   final BarrageConfig config;
+
+  PreviewShadowSpan copyWithY(double newY) {
+    return PreviewShadowSpan(
+      x: x,
+      y: newY,
+      width: width,
+      height: height,
+      text: text,
+      paragraph: paragraph,
+      config: config,
+    );
+  }
+
   @override
   void paint(ui.Canvas canvas) {
     final shadowList = ShadowEffect(
@@ -249,7 +280,8 @@ class PreviewShadowSpan extends TextLayoutSpan {
       )
       ..addText(text);
     final shadowParagraph = builder.build()..layout(ui.ParagraphConstraints(width: width));
-    canvas.drawParagraph(shadowParagraph, ui.Offset(x, y));
+    canvas.drawParagraph(shadowParagraph, ui.Offset(x + 4.0, y + 4.0));
+    canvas.drawParagraph(paragraph, ui.Offset(x, y));
   }
 }
 
@@ -281,7 +313,7 @@ class GlowInterceptor extends BarrageEffectInterceptor {
 }
 
 class PreviewGlowSpan extends TextLayoutSpan {
-  PreviewGlowSpan({
+  const PreviewGlowSpan({
     required super.x,
     required super.y,
     required super.width,
@@ -291,6 +323,18 @@ class PreviewGlowSpan extends TextLayoutSpan {
     required this.config,
   });
   final BarrageConfig config;
+  PreviewGlowSpan copyWithY(double newY) {
+    return PreviewGlowSpan(
+      x: x,
+      y: newY,
+      width: width,
+      height: height,
+      text: text,
+      paragraph: paragraph,
+      config: config,
+    );
+  }
+
   @override
   void paint(ui.Canvas canvas) {
     final glowPaint = GlowEffect(glowColor: const ui.Color(0xFFFFEA00), blurRadius: 8.0).createGlowPaint();
@@ -302,7 +346,11 @@ class PreviewGlowSpan extends TextLayoutSpan {
     for (int i = 0; i < 4; i++) {
       canvas.drawParagraph(glowParagraph, ui.Offset(x, y) + offsets[i] * 0.5);
     }
-    super.paint(canvas);
+    final contentBuilder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: config.fontSize))
+      ..pushStyle(ui.TextStyle(color: Colors.white, fontSize: config.fontSize, fontWeight: config.fontWeight))
+      ..addText(text);
+    final contentParagraph = contentBuilder.build()..layout(ui.ParagraphConstraints(width: width));
+    canvas.drawParagraph(contentParagraph, ui.Offset(x, y));
   }
 }
 
@@ -334,7 +382,7 @@ class RainbowInterceptor extends BarrageEffectInterceptor {
 }
 
 class PreviewRainbowSpan extends TextLayoutSpan {
-  PreviewRainbowSpan({
+  const PreviewRainbowSpan({
     required super.x,
     required super.y,
     required super.width,
@@ -344,13 +392,31 @@ class PreviewRainbowSpan extends TextLayoutSpan {
     required this.config,
   });
   final BarrageConfig config;
+  PreviewRainbowSpan copyWithY(double newY) {
+    return PreviewRainbowSpan(
+      x: x,
+      y: newY,
+      width: width,
+      height: height,
+      text: text,
+      paragraph: paragraph,
+      config: config,
+    );
+  }
+
   @override
   void paint(ui.Canvas canvas) {
-    final shader = GradientEffect(
-      colors: const [Colors.red, Colors.orange, Colors.yellow, Colors.green, Colors.blue, Colors.purple],
-    ).createGradientPaint(textBounds: ui.Rect.fromLTWH(x, y, width, height));
+    final linearGradientShader = ui.Gradient.linear(
+      ui.Offset(x, y),
+      ui.Offset(x + width, y),
+      const [Colors.red, Colors.orange, Colors.yellow, Colors.green, Colors.blue, Colors.purple],
+      const [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+    );
+    final textPaint = ui.Paint()
+      ..shader = linearGradientShader
+      ..isAntiAlias = true;
     final builder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: config.fontSize))
-      ..pushStyle(ui.TextStyle(foreground: shader, fontSize: config.fontSize, fontWeight: ui.FontWeight.bold))
+      ..pushStyle(ui.TextStyle(foreground: textPaint, fontSize: config.fontSize, fontWeight: ui.FontWeight.bold))
       ..addText(text);
     final rainbowParagraph = builder.build()..layout(ui.ParagraphConstraints(width: width));
     canvas.drawParagraph(rainbowParagraph, ui.Offset(x, y));

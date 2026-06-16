@@ -10,6 +10,7 @@ import 'custom_effect_demo_screen.dart';
 import 'combo_animation_demo_screen.dart';
 import 'barrage_config_panel_screen.dart';
 import 'package:flame_barrage/flame_barrage.dart';
+import 'package:example/demo/effects_preview_screen.dart';
 
 class BarrageRouter {
   static BarrageConfig globalConfig = const BarrageConfig(trackHeight: 40, maxVisibleCount: 150);
@@ -25,6 +26,7 @@ class BarrageRouter {
       '/combo': (context) => const ComboAnimationDemoScreen(),
       '/custom_effect': (context) => const CustomEffectDemoScreen(),
       '/memory': (context) => const MemoryProfileScreen(),
+      '/effects_preview': (context) => const EffectsPreviewScreen(),
       '/config_panel': (context) => BarrageConfigPanelScreen(
         initialConfig: globalConfig,
         onConfigChanged: (newConfig) {

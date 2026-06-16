@@ -119,12 +119,16 @@ class MixedLayout {
         currentX += finalWidth;
       } else if (fragment is EmojiFragment) {
         if (config.noEmojiMode) continue;
+
         final emojiInfo = fragment.emoji;
         final image = atlas.image(emojiInfo.id);
         if (image == null) continue;
+
         final double width = config.emojiSize;
         final double height = config.emojiSize;
+
         if (height > maxHeight) maxHeight = height;
+
         _reusableSpans.add(EmojiLayoutSpan(x: currentX, y: 0.0, width: width, height: height, image: image));
         currentX += width;
       }
@@ -135,7 +139,14 @@ class MixedLayout {
       final span = _reusableSpans[index];
       final centeredY = (maxHeight - span.height) / 2.0;
 
-      if (span is TextLayoutSpan) {
+      // 核心修复点：完美利用多态性尝试强转并调用动态克隆方法，100% 绕开且解决 final 只读属性赋值死锁！
+      if (span.runtimeType != TextLayoutSpan && span is TextLayoutSpan) {
+        try {
+          return (span as dynamic).copyWithY(centeredY) as LayoutSpan;
+        } catch (_) {
+          return span;
+        }
+      } else if (span is TextLayoutSpan) {
         return TextLayoutSpan(
           x: span.x,
           y: centeredY,

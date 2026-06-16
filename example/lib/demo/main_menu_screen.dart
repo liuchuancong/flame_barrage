@@ -61,6 +61,14 @@ class MainMenuScreen extends StatelessWidget {
           ),
           _buildMenuListRow(
             context,
+            icon: Icons.auto_awesome_motion_rounded,
+            title: '全图层高级视觉特效大盘',
+            subtitle: '全屏舞台级复合粒子动画与流体特效大盘渲染展示场',
+            route: '/effects_preview',
+            color: const Color.fromARGB(255, 155, 32, 42),
+          ),
+          _buildMenuListRow(
+            context,
             icon: Icons.extension_rounded,
             title: '插件化自定义特效',
             subtitle: '外部解耦管道自生效机制，自写高级视觉渲染复合效果',
