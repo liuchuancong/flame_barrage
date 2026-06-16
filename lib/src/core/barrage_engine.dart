@@ -32,6 +32,8 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   final Queue<BarrageItem> _waiting = Queue<BarrageItem>();
   List<BarrageEntry> _activeEntries = [];
   List<BarrageEntry> _backbufferEntries = [];
+  int get activeCacheSize => _pictureCache.size;
+  int get activePoolSize => _pool.currentSize;
 
   int _currentAliveCount = 0;
 

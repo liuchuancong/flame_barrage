@@ -46,8 +46,6 @@ class _FlameBarrageWidgetState extends State<FlameBarrageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return GameWidget(game: _engine);
+    return IgnorePointer(child: GameWidget(game: _engine));
   }
-
-  dynamic get engine => _engine;
 }

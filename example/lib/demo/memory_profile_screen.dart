@@ -11,8 +11,10 @@ class MemoryProfileScreen extends StatefulWidget {
 }
 
 class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
-  final BarrageController _controller = BarrageController();
+  static final BarrageController _singletonController = BarrageController();
+
   Timer? _burstTimer;
+  Timer? _telemetryTimer;
   bool _isFlooding = false;
 
   int _totalEmitted = 0;
@@ -22,11 +24,14 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _startTelemetryLoop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startTelemetryLoop();
+    });
   }
 
   void _startTelemetryLoop() {
-    Timer.periodic(const Duration(milliseconds: 400), (timer) {
+    _telemetryTimer?.cancel();
+    _telemetryTimer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -36,17 +41,11 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
   }
 
   void _fetchEngineMetrics() {
-    try {
-      final dynamic engine = (_controller as dynamic)._engine;
-      if (engine != null) {
-        final pictureCache = engine._pictureCache;
-        final pool = engine._pool;
-        setState(() {
-          _pictureCacheCount = pictureCache.size;
-          _poolObjectCount = (pool as dynamic).currentSize ?? 0;
-        });
-      }
-    } catch (_) {}
+    setState(() {
+      _totalEmitted = _singletonController.totalEmitted;
+      _pictureCacheCount = _singletonController.pictureCacheCount;
+      _poolObjectCount = _singletonController.poolObjectCount;
+    });
   }
 
   void _toggleFloodStressTest() {
@@ -57,10 +56,9 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
     if (_isFlooding) {
       _burstTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
         for (int i = 0; i < 5; i++) {
-          _totalEmitted++;
-          _controller.send(
+          _singletonController.send(
             BarrageItem(
-              content: '显存压测弹幕流水线 #$_totalEmitted [滑稽]随机码:${DateTime.now().microsecond}',
+              content: '显存压测弹幕流水线 #${_singletonController.totalEmitted + 1} [滑稽]随机码:${DateTime.now().microsecond}',
               type: BarrageType.scroll,
             ),
           );
@@ -73,20 +71,25 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
   }
 
   void _executeHardClear() {
-    _controller.clear();
-    BarrageLogger.i('MemoryProfile', '已触发全舞台硬核清屏，底层 C++ Picture.dispose() 指针已全部销毁。');
+    _singletonController.clear();
+    setState(() {
+      _pictureCacheCount = 0;
+      _poolObjectCount = 0;
+    });
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已强制解构视口及二级缓存，显存已安全回落！')));
   }
 
   @override
   void dispose() {
+    _telemetryTimer?.cancel();
     _burstTimer?.cancel();
-    _controller.detach();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentConfig = BarrageRouter.globalConfig;
+
     return Scaffold(
       appBar: AppBar(title: const Text('真机显存与常驻内存监控')),
       body: Column(
@@ -100,13 +103,13 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
                 const SizedBox(height: 8),
                 _buildMetricRow(
                   'Picture 位图硬件缓存 (LRU)',
-                  '$_pictureCacheCount / ${BarrageRouter.globalConfig.pictureCacheMaxSize}',
+                  '$_pictureCacheCount / ${currentConfig.pictureCacheMaxSize}',
                   Colors.orange,
                 ),
                 const SizedBox(height: 8),
                 _buildMetricRow(
                   'BarragePool 常驻组件复用数',
-                  '$_poolObjectCount / ${BarrageRouter.globalConfig.barragePoolMaxSize}',
+                  '$_poolObjectCount / ${currentConfig.barragePoolMaxSize}',
                   Colors.green,
                 ),
               ],
@@ -116,9 +119,9 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
             child: Container(
               color: Colors.black,
               child: FlameBarrageWidget(
-                config: BarrageRouter.globalConfig,
+                config: currentConfig,
                 emojiAtlas: EmojiAtlas.instance,
-                controller: _controller,
+                controller: _singletonController,
               ),
             ),
           ),
