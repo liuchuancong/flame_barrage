@@ -41,7 +41,6 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
   double _opacity = 1.0;
   double _topAreaDistance = 0;
   double _bottomAreaDistance = 0;
-  Duration _scrollDuration = Duration(seconds: 8);
   Duration _fixedDuration = Duration(seconds: 4);
   bool _safeArea = true;
   int _fps = 60;
@@ -64,7 +63,6 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
     _area = config.area;
     _topAreaDistance = config.topAreaDistance;
     _bottomAreaDistance = config.bottomAreaDistance;
-    _scrollDuration = config.scrollDuration;
     _fixedDuration = config.fixedDuration;
 
     _safeArea = config.safeArea;
@@ -117,7 +115,6 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
       area: _area,
       topAreaDistance: _topAreaDistance,
       bottomAreaDistance: _bottomAreaDistance,
-      scrollDuration: _scrollDuration,
       fixedDuration: _fixedDuration,
       hideTop: _hideTop,
       hideBottom: _hideBottom,
@@ -303,14 +300,6 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
 
                 const Divider(height: 32),
                 _buildSectionTitle('⏱️ 时间与速度控制'),
-                _buildDurationSetting(
-                  '滚动弹幕持续时间 (scrollDuration)',
-                  _scrollDuration,
-                  (v) => setState(() {
-                    _scrollDuration = v;
-                    _pushLiveUpdate();
-                  }),
-                ),
                 _buildDurationSetting(
                   '固定弹幕持续时间 (fixedDuration)',
                   _fixedDuration,

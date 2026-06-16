@@ -14,7 +14,6 @@ class BarrageConfig {
     this.area = 1.0,
     this.topAreaDistance = 0,
     this.bottomAreaDistance = 0,
-    this.scrollDuration = const Duration(seconds: 8),
     this.fixedDuration = const Duration(seconds: 4),
     this.safeArea = true,
     this.fps = 60,
@@ -60,9 +59,6 @@ class BarrageConfig {
 
   /// Fixed buffer margin padding inset from the absolute bottom viewport edge.
   final double bottomAreaDistance;
-
-  /// Total migration sliding time allowed for scroll barrages across the canvas window.
-  final Duration scrollDuration;
 
   /// Total presentation lifetime duration allowed for fixed top and bottom barrages.
   final Duration fixedDuration;
@@ -120,7 +116,6 @@ class BarrageConfig {
     double? area,
     double? topAreaDistance,
     double? bottomAreaDistance,
-    Duration? scrollDuration,
     Duration? fixedDuration,
     bool? hideTop,
     bool? hideBottom,
@@ -150,7 +145,6 @@ class BarrageConfig {
       area: area ?? this.area,
       topAreaDistance: topAreaDistance ?? this.topAreaDistance,
       bottomAreaDistance: bottomAreaDistance ?? this.bottomAreaDistance,
-      scrollDuration: scrollDuration ?? this.scrollDuration,
       fixedDuration: fixedDuration ?? this.fixedDuration,
       safeArea: safeArea ?? this.safeArea,
       fps: fps ?? this.fps,
@@ -183,7 +177,6 @@ class BarrageConfig {
         other.topAreaDistance == topAreaDistance &&
         other.bottomAreaDistance == bottomAreaDistance &&
         other.safeArea == safeArea &&
-        other.scrollDuration == scrollDuration &&
         other.fixedDuration == fixedDuration &&
         other.fps == fps &&
         other.trackHeight == trackHeight &&
@@ -212,7 +205,6 @@ class BarrageConfig {
       topAreaDistance,
       bottomAreaDistance,
       safeArea,
-      scrollDuration,
       fixedDuration,
       fps,
       trackHeight,

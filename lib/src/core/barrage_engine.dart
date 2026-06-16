@@ -199,8 +199,6 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       if (!entry.active) continue;
 
       if (entry.item.type == BarrageType.scroll) {
-        // 终极绝杀：直接让单帧物理运动方程，垂直、高频直刷去吃最新的 _config.baseSpeed 配置超参！
-        // 彻底破除因属性录制锁死引发的移速不动态联动大黑洞，新老弹幕在视口里原地实现极致平滑变速滑行！
         entry.x -= _config.baseSpeed * dt;
         if (entry.x + entry.width < 0) {
           entry.active = false;
