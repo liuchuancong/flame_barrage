@@ -18,12 +18,7 @@ class _CustomEffectDemoScreenState extends State<CustomEffectDemoScreen> {
   @override
   void initState() {
     super.initState();
-    _config = const BarrageConfig(
-      trackHeight: 44,
-      maxTrackCount: 8,
-      fontSize: 20,
-      effectInterceptors: [VipRainbowInterceptor()],
-    );
+    _config = const BarrageConfig(trackHeight: 44, fontSize: 20, effectInterceptors: [VipRainbowInterceptor()]);
   }
 
   void _sendBarrage() {

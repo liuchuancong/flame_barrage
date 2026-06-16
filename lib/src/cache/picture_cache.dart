@@ -1,40 +1,41 @@
-import 'dart:ui';
+import 'dart:ui' as ui;
+import 'dart:collection';
 
 class PictureCache {
-  PictureCache({this.maxSize = 200});
+  PictureCache({required this.maxSize});
 
-  final int maxSize;
-  final Map<String, Picture> _cache = {};
-
+  int maxSize;
   int get size => _cache.length;
 
-  bool contains(String key) => _cache.containsKey(key);
+  final LinkedHashMap<String, ui.Picture> _cache = LinkedHashMap<String, ui.Picture>();
 
-  Picture? get(String key) {
-    final value = _cache.remove(key);
-    if (value != null) {
-      _cache[key] = value;
+  ui.Picture? get(String key) {
+    final picture = _cache.remove(key);
+    if (picture != null) {
+      _cache[key] = picture;
+      return picture;
     }
-    return value;
+    return null;
   }
 
-  void put(String key, Picture picture) {
-    if (_cache.containsKey(key)) {
-      return;
-    }
-
-    if (_cache.length >= maxSize) {
+  void put(String key, ui.Picture picture) {
+    _cache.remove(key);
+    if (_cache.length >= maxSize && _cache.isNotEmpty) {
       final firstKey = _cache.keys.first;
-      final oldestPicture = _cache.remove(firstKey);
-      oldestPicture?.dispose();
+      final oldest = _cache.remove(firstKey);
+      oldest?.dispose();
     }
-
     _cache[key] = picture;
   }
 
-  void remove(String key) {
-    final picture = _cache.remove(key);
-    picture?.dispose();
+  void updateMaxSize(int newMaxSize) {
+    if (newMaxSize <= 0) return;
+    maxSize = newMaxSize;
+    while (_cache.length > maxSize && _cache.isNotEmpty) {
+      final firstKey = _cache.keys.first;
+      final oldest = _cache.remove(firstKey);
+      oldest?.dispose();
+    }
   }
 
   void clear() {

@@ -6,7 +6,8 @@ class MixedLayout {
 
   final EmojiAtlas atlas;
   TextCache _textCache;
-  final Map<String, LayoutResult> _cache = {};
+  final Map<int, LayoutResult> _cache = {};
+  final List<LayoutSpan> _reusableSpans = [];
 
   int get cacheCount => _cache.length;
 
@@ -24,30 +25,36 @@ class MixedLayout {
   }
 
   LayoutResult layout(List<Fragment> fragments, {required BarrageItem item, required BarrageConfig config}) {
-    final cacheKey = '${_buildCacheKey(fragments, config)}|${item.priority}';
+    final int combinedHash = _buildNumericCacheKey(fragments, config, item.priority);
 
-    final cached = _cache[cacheKey];
+    final cached = _cache[combinedHash];
     if (cached != null) {
       return cached;
     }
 
-    final result = _layoutInternal(fragments, item, config, cacheKey);
-    _cache[cacheKey] = result;
+    final result = _layoutInternal(fragments, item, config, combinedHash);
+    _cache[combinedHash] = result;
 
     return result;
   }
 
-  LayoutResult _layoutInternal(List<Fragment> fragments, BarrageItem item, BarrageConfig config, String cacheKey) {
-    final spans = <LayoutSpan>[];
+  LayoutResult _layoutInternal(List<Fragment> fragments, BarrageItem item, BarrageConfig config, int combinedHash) {
+    _reusableSpans.clear();
     double currentX = 0.0;
     double maxHeight = 0.0;
 
-    final len = fragments.length;
+    final int colorValue = config.textColor.toARGB32();
+    final double fontSize = config.fontSize;
+    final bool showStroke = config.showStroke;
+    final List<BarrageEffectInterceptor> interceptors = config.effectInterceptors;
+    final int intceptorLen = interceptors.length;
+
+    final int len = fragments.length;
     for (int i = 0; i < len; i++) {
       final fragment = fragments[i];
 
       if (fragment is TextFragment) {
-        final textCacheKey = '${fragment.text}|${config.fontSize}|${config.textColor.toARGB32()}|${config.showStroke}';
+        final textCacheKey = '${fragment.text}|$fontSize|$colorValue|$showStroke';
         final paragraph = _buildParagraph(fragment.text, config, textCacheKey);
 
         final width = paragraph.maxIntrinsicWidth;
@@ -55,10 +62,7 @@ class MixedLayout {
 
         if (height > maxHeight) maxHeight = height;
 
-        final interceptors = config.effectInterceptors;
-        final intceptorLen = interceptors.length;
         dynamic matchedInterceptor;
-
         for (int j = 0; j < intceptorLen; j++) {
           if (interceptors[j].shouldIntercept(item, config)) {
             matchedInterceptor = interceptors[j];
@@ -77,9 +81,9 @@ class MixedLayout {
             height: height,
             config: config,
           );
-          spans.add(customSpan);
+          _reusableSpans.add(customSpan);
         } else {
-          spans.add(
+          _reusableSpans.add(
             TextLayoutSpan(
               x: currentX,
               y: 0.0,
@@ -92,6 +96,8 @@ class MixedLayout {
         }
         currentX += width;
       } else if (fragment is EmojiFragment) {
+        if (config.noEmojiMode) continue;
+
         final image = atlas.image(fragment.emoji.id);
         if (image == null) continue;
 
@@ -103,18 +109,20 @@ class MixedLayout {
         final animation = atlas.getAnimation(fragment.emoji.id);
         final player = animation != null ? SpriteAnimationPlayer(animation: animation) : null;
 
-        spans.add(EmojiLayoutSpan(x: currentX, y: 0.0, width: width, height: height, image: image, player: player));
+        _reusableSpans.add(
+          EmojiLayoutSpan(x: currentX, y: 0.0, width: width, height: height, image: image, player: player),
+        );
         currentX += width;
       }
     }
 
-    final spanLen = spans.length;
-    for (int i = 0; i < spanLen; i++) {
-      final span = spans[i];
+    final spanLen = _reusableSpans.length;
+    final finalSpans = List<LayoutSpan>.generate(spanLen, (index) {
+      final span = _reusableSpans[index];
       final centeredY = (maxHeight - span.height) / 2.0;
 
       if (span is TextLayoutSpan) {
-        spans[i] = TextLayoutSpan(
+        return TextLayoutSpan(
           x: span.x,
           y: centeredY,
           width: span.width,
@@ -122,19 +130,20 @@ class MixedLayout {
           text: span.text,
           paragraph: span.paragraph,
         );
-      } else if (span is EmojiLayoutSpan) {
-        spans[i] = EmojiLayoutSpan(
-          x: span.x,
+      } else {
+        final emojiSpan = span as EmojiLayoutSpan;
+        return EmojiLayoutSpan(
+          x: emojiSpan.x,
           y: centeredY,
-          width: span.width,
-          height: span.height,
-          image: span.image,
-          player: span.player,
+          width: emojiSpan.width,
+          height: emojiSpan.height,
+          image: emojiSpan.image,
+          player: emojiSpan.player,
         );
       }
-    }
+    });
 
-    return LayoutResult(width: currentX, height: maxHeight, spans: spans, cacheKey: cacheKey);
+    return LayoutResult(width: currentX, height: maxHeight, spans: finalSpans, cacheKey: combinedHash.toString());
   }
 
   ui.Paragraph _buildParagraph(String text, BarrageConfig config, String textCacheKey) {
@@ -143,7 +152,8 @@ class MixedLayout {
       return cached;
     }
 
-    final builder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: config.fontSize));
+    // 终极优化：强制注入 height: 1.0 固定物理单行度量，暴砍 C++ 矢量字符探边开销
+    final builder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: config.fontSize, height: 1.0));
     final textStyle = ui.TextStyle(fontSize: config.fontSize, fontWeight: config.fontWeight, color: config.textColor);
 
     builder.pushStyle(textStyle);
@@ -156,27 +166,23 @@ class MixedLayout {
     return paragraph;
   }
 
-  String _buildCacheKey(List<Fragment> fragments, BarrageConfig config) {
-    final buffer = StringBuffer();
-
-    buffer.write(config.fontSize);
-    buffer.write('|');
-    buffer.write(config.fontWeight.toString());
-    buffer.write('|');
-    buffer.write(config.textColor.toARGB32());
-    buffer.write('|');
-    buffer.write(config.emojiSize);
+  int _buildNumericCacheKey(List<Fragment> fragments, BarrageConfig config, int priority) {
+    int hash = 17;
+    hash = 37 * hash + config.fontSize.hashCode;
+    hash = 37 * hash + config.fontWeight.hashCode;
+    hash = 37 * hash + config.textColor.toARGB32().hashCode;
+    hash = 37 * hash + config.emojiSize.hashCode;
+    hash = 37 * hash + priority.hashCode;
 
     final len = fragments.length;
     for (int i = 0; i < len; i++) {
       final fragment = fragments[i];
       if (fragment is TextFragment) {
-        buffer.write(fragment.text);
+        hash = 37 * hash + fragment.text.hashCode;
       } else if (fragment is EmojiFragment) {
-        buffer.write(fragment.emoji.id);
+        hash = 37 * hash + fragment.emoji.id.hashCode;
       }
     }
-
-    return buffer.toString();
+    return hash;
   }
 }

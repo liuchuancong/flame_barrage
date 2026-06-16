@@ -1,30 +1,35 @@
-import 'dart:ui';
-import '../model/barrage/barrage_entry.dart';
-import '../components/barrage_component.dart';
+import 'dart:collection';
+import '../../src/model/barrage/barrage_item.dart';
+import '../../src/model/barrage/barrage_entry.dart';
 
 class BarragePool {
-  BarragePool({this.maxSize = 100});
+  BarragePool({required this.maxSize});
 
-  final int maxSize;
-  final List<BarrageComponent> _pool = [];
+  int maxSize;
+  final Queue<BarrageEntry> _pool = Queue<BarrageEntry>();
 
-  int get size => _pool.length;
+  int get currentSize => _pool.length;
 
-  BarrageComponent obtain({required BarrageEntry entry, required Picture picture, required Duration fixedDuration}) {
+  BarrageEntry obtain({required BarrageItem item, required int creationTime}) {
     if (_pool.isNotEmpty) {
-      final comp = _pool.removeLast();
-      comp.reset(newEntry: entry, newPicture: picture, newFixedDuration: fixedDuration);
-      return comp;
+      final entry = _pool.removeFirst();
+      entry.reset(newItem: item, newCreationTime: creationTime);
+      return entry;
     }
-    return BarrageComponent(entry: entry, picture: picture, fixedDuration: fixedDuration);
+    return BarrageEntry(item: item, creationTime: creationTime);
   }
 
-  void recycle(BarrageComponent component) {
-    if (component.isMounted) {
-      component.removeFromParent();
-    }
+  void recycle(BarrageEntry entry) {
     if (_pool.length < maxSize) {
-      _pool.add(component);
+      _pool.addLast(entry);
+    }
+  }
+
+  void updateMaxSize(int newMaxSize) {
+    if (newMaxSize <= 0) return;
+    maxSize = newMaxSize;
+    while (_pool.length > maxSize && _pool.isNotEmpty) {
+      _pool.removeFirst();
     }
   }
 

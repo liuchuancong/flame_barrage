@@ -5,10 +5,10 @@ class BarrageEntry {
   BarrageEntry({required this.item, required this.creationTime});
 
   /// 原始弹幕
-  final BarrageItem item;
+  BarrageItem item;
 
   /// 创建时间(ms)
-  final int creationTime;
+  int creationTime;
 
   /// X坐标
   double x = 0;
@@ -50,4 +50,22 @@ class BarrageEntry {
 
   /// 宽度缓存
   double? cachedWidth;
+  void reset({required BarrageItem newItem, required int newCreationTime}) {
+    item = newItem;
+    creationTime = newCreationTime;
+    x = 0;
+    y = 0;
+    width = 0;
+    height = 0;
+    track = -1;
+    speed = 0;
+    active = true;
+    lifeTime = 0;
+    lastDrawTick = null;
+    paragraph = null;
+    strokeParagraph = null;
+    picture = null;
+    pictureCacheKey = null;
+    cachedWidth = null;
+  }
 }

@@ -20,7 +20,6 @@ class _EffectsPreviewScreenState extends State<EffectsPreviewScreen> {
     super.initState();
     _config = const BarrageConfig(
       trackHeight: 44,
-      maxTrackCount: 10,
       fontSize: 20,
       showStroke: true,
       effectInterceptors: [StrokeInterceptor(), ShadowInterceptor(), GlowInterceptor(), RainbowInterceptor()],

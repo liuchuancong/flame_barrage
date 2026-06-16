@@ -2,7 +2,19 @@ import 'dart:ui';
 import 'dart:collection';
 import 'package:flame/game.dart';
 import 'package:flame/events.dart';
-import 'package:flame_barrage/flame_barrage.dart';
+import '../atlas/emoji_atlas.dart';
+import '../pool/barrage_pool.dart';
+import '../layout/rich_parser.dart';
+import '../cache/picture_cache.dart';
+import '../core/barrage_config.dart';
+import '../layout/mixed_layout.dart';
+import '../scheduler/track_manager.dart';
+import '../scheduler/speed_strategy.dart';
+import '../scheduler/track_allocator.dart';
+import '../model/barrage/barrage_item.dart';
+import '../model/barrage/barrage_type.dart';
+import '../model/barrage/barrage_entry.dart';
+import '../render/barrage/mixed_renderer.dart';
 import 'package:flutter/material.dart' show Colors;
 
 class BarrageEngine extends FlameGame with TapCallbacks {
@@ -12,7 +24,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       _pool = BarragePool(maxSize: config.barragePoolMaxSize) {
     _parser = RichParser(atlas: emojiAtlas);
     _layout = MixedLayout(atlas: emojiAtlas, maxTextCacheSize: config.textCacheMaxSize);
-    _renderer = MixedRenderer();
+    _renderer = const MixedRenderer();
   }
 
   BarrageConfig _config;
@@ -30,63 +42,81 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   final BarragePool _pool;
 
   final Queue<BarrageItem> _waiting = Queue<BarrageItem>();
-  final List<BarrageComponent> _activeComponentCache = [];
+
+  // 巅峰优化：双常驻数组指针原地互换，终结任何 List.from() 的堆申请和 GC 海啸
+  List<BarrageEntry> _activeEntries = [];
+  List<BarrageEntry> _backbufferEntries = [];
 
   double _emitTimer = 0.0;
   double _metricTimer = 0.0;
-  bool _massiveMode = false;
+  double _cleanupTimer = 0.0;
   bool _initialized = false;
-
-  BarrageComponent? _hitTestActiveComponents(Offset localPos) {
-    final int len = _activeComponentCache.length;
-    for (int i = len - 1; i >= 0; i--) {
-      final comp = _activeComponentCache[i];
-      if (comp.isRemoving || !comp.isMounted) continue;
-
-      final double left = comp.position.x;
-      final double top = comp.position.y;
-      final double right = left + comp.size.x;
-      final double bottom = top + comp.size.y;
-
-      if (localPos.dx >= left && localPos.dx <= right && localPos.dy >= top && localPos.dy <= bottom) {
-        return comp;
-      }
-    }
-    return null;
-  }
 
   @override
   void onTapDown(TapDownEvent event) {
-    final comp = _hitTestActiveComponents(Offset(event.localPosition.x, event.localPosition.y));
-    if (comp != null) {
-      event.handled = true;
-      comp.entry.item.onTapDown?.call();
+    final clickPos = event.localPosition;
+    final int len = _activeEntries.length;
+
+    for (int i = len - 1; i >= 0; i--) {
+      final entry = _activeEntries[i];
+      if (!entry.active) continue;
+
+      final double left = entry.x;
+      final double top = entry.y;
+      final double right = left + entry.width;
+      final double bottom = top + entry.height;
+
+      if (clickPos.x >= left && clickPos.x <= right && clickPos.y >= top && clickPos.y <= bottom) {
+        event.handled = true;
+        entry.item.onTapDown?.call();
+        break;
+      }
     }
   }
 
   @override
   void onLongTapDown(TapDownEvent event) {
-    final comp = _hitTestActiveComponents(Offset(event.localPosition.x, event.localPosition.y));
-    if (comp != null) {
-      event.handled = true;
-      comp.entry.item.onLongTapDown?.call();
+    final clickPos = event.localPosition;
+    final int len = _activeEntries.length;
+    for (int i = len - 1; i >= 0; i--) {
+      final entry = _activeEntries[i];
+      if (!entry.active) continue;
+      if (clickPos.x >= entry.x &&
+          clickPos.x <= entry.x + entry.width &&
+          clickPos.y >= entry.y &&
+          clickPos.y <= entry.y + entry.height) {
+        event.handled = true;
+        entry.item.onLongTapDown?.call();
+        break;
+      }
     }
   }
 
   @override
   void onTapUp(TapUpEvent event) {
-    final comp = _hitTestActiveComponents(Offset(event.localPosition.x, event.localPosition.y));
-    if (comp != null) {
-      event.handled = true;
-      comp.entry.item.onTapUp?.call();
+    final clickPos = event.localPosition;
+    final int len = _activeEntries.length;
+    for (int i = len - 1; i >= 0; i--) {
+      final entry = _activeEntries[i];
+      if (!entry.active) continue;
+      if (clickPos.x >= entry.x &&
+          clickPos.x <= entry.x + entry.width &&
+          clickPos.y >= entry.y &&
+          clickPos.y <= entry.y + entry.height) {
+        event.handled = true;
+        entry.item.onTapUp?.call();
+        break;
+      }
     }
   }
 
   @override
   void onTapCancel(TapCancelEvent event) {
-    final int len = _activeComponentCache.length;
+    final int len = _activeEntries.length;
     for (int i = 0; i < len; i++) {
-      _activeComponentCache[i].entry.item.onTapCancel?.call();
+      if (_activeEntries[i].active) {
+        _activeEntries[i].item.onTapCancel?.call();
+      }
     }
   }
 
@@ -96,6 +126,8 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   void updateConfig(BarrageConfig newConfig) {
     _config = newConfig;
     _layout.updateMaxTextCacheSize(newConfig.textCacheMaxSize);
+    _pictureCache.updateMaxSize(newConfig.pictureCacheMaxSize);
+    _pool.updateMaxSize(newConfig.barragePoolMaxSize);
     if (_initialized) {
       _trackManager.initialize(_config, size.y);
     }
@@ -116,12 +148,6 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   }
 
   void pushMessage(BarrageItem item) {
-    if (item.content.length > _config.maxTextLength) return;
-
-    if (_waiting.length > _config.dangerousQueueSize) {
-      if (item.priority < 1) return;
-      _waiting.removeFirst();
-    }
     _waiting.add(item);
   }
 
@@ -130,14 +156,52 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     super.update(dt);
     if (!_initialized) return;
 
-    _massiveMode = _waiting.length > _config.massiveModeThreshold;
-
     _emitTimer += dt;
-    final interval = _massiveMode ? _config.massiveEmitInterval : _config.normalEmitInterval;
-
-    if (_emitTimer >= interval) {
+    if (_emitTimer >= _config.emitInterval) {
       _emitTimer = 0.0;
       _dispatchWaiting();
+    }
+
+    final int len = _activeEntries.length;
+    final double fixedDurationSec = _config.fixedDurationMs / 1000.0;
+
+    for (int i = 0; i < len; i++) {
+      final entry = _activeEntries[i];
+      if (!entry.active) continue;
+
+      if (entry.item.type == BarrageType.scroll) {
+        entry.x -= entry.speed * dt;
+        if (entry.x + entry.width < 0) {
+          entry.active = false;
+        }
+      } else {
+        entry.lifeTime += dt;
+        if (entry.lifeTime >= fixedDurationSec) {
+          entry.active = false;
+        }
+      }
+    }
+
+    _cleanupTimer += dt;
+    if (_cleanupTimer >= 0.5) {
+      _cleanupTimer = 0.0;
+
+      _backbufferEntries.clear();
+      final int currentLen = _activeEntries.length;
+
+      for (int i = 0; i < currentLen; i++) {
+        final entry = _activeEntries[i];
+        if (entry.active) {
+          _backbufferEntries.add(entry);
+        } else {
+          _pool.recycle(entry);
+        }
+      }
+
+      // 0 开销原地互换指针：完全避免了重新 new 数组的开销，GC 抖动彻底归 0，闪烁彻底死锁解决！
+      final List<BarrageEntry> temp = _activeEntries;
+      _activeEntries = _backbufferEntries;
+      _backbufferEntries = temp;
     }
 
     _metricTimer += dt;
@@ -149,13 +213,22 @@ class BarrageEngine extends FlameGame with TapCallbacks {
 
   void _dispatchWaiting() {
     if (_waiting.isEmpty) return;
-    if (_activeComponentCache.length >= _config.maxVisibleCount) return;
+
+    int aliveCount = 0;
+    final int currentLen = _activeEntries.length;
+    for (int i = 0; i < currentLen; i++) {
+      if (_activeEntries[i].active) aliveCount++;
+    }
+    if (aliveCount >= _config.maxVisibleCount) return;
+
+    _trackManager.initialize(_config, size.y);
+    if (_trackManager.tracks.isEmpty) return;
 
     final item = _waiting.first;
     final fragments = _parser.parse(item.content);
     final layoutResult = _layout.layout(fragments, item: item, config: _config);
 
-    final mockEntry = BarrageEntry(item: item, creationTime: DateTime.now().millisecondsSinceEpoch)
+    final mockEntry = _pool.obtain(item: item, creationTime: DateTime.now().millisecondsSinceEpoch)
       ..width = layoutResult.width
       ..height = layoutResult.height
       ..speed = item.type == BarrageType.scroll ? 100.0 : 0.0;
@@ -164,11 +237,13 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       tracks: _trackManager.tracks,
       current: mockEntry,
       screenWidth: size.x,
-      massiveMode: _massiveMode,
       config: _config,
     );
 
-    if (trackIndex == -1) return;
+    if (trackIndex == -1) {
+      _pool.recycle(mockEntry);
+      return;
+    }
 
     _waiting.removeFirst();
 
@@ -197,44 +272,37 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     mockEntry.track = trackIndex;
     mockEntry.x = startX;
     mockEntry.y = startY;
+    mockEntry.picture = picture;
+    mockEntry.active = true;
 
     mockEntry.speed = item.type == BarrageType.scroll
-        ? _speedStrategy.calculate(mockEntry, size.x, _config, targetTrack: track, massiveMode: _massiveMode)
+        ? _speedStrategy.calculate(mockEntry, size.x, _config, targetTrack: track)
         : 0.0;
-
-    final component = _pool.obtain(
-      entry: mockEntry,
-      picture: picture,
-      fixedDuration: Duration(milliseconds: _config.fixedDurationMs),
-    );
-
-    component.opacity = _config.opacity;
 
     track.lastRight = startX + layoutResult.width;
     track.lastEntry = mockEntry;
     track.activeCount++;
 
-    _activeComponentCache.add(component);
-    add(component);
+    _activeEntries.add(mockEntry);
   }
 
   void _updateTrackMetrics() {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final compLen = _activeComponentCache.length;
+    final entryLen = _activeEntries.length;
 
     for (final track in _trackManager.tracks) {
       double totalSpeed = 0.0;
       int count = 0;
-      BarrageComponent? youngestComp;
+      BarrageEntry? youngestEntry;
 
-      for (int i = 0; i < compLen; i++) {
-        final comp = _activeComponentCache[i];
-        if (comp.isRemoving) continue;
-        if (comp.entry.track == track.index) {
-          totalSpeed += comp.entry.speed;
+      for (int i = 0; i < entryLen; i++) {
+        final entry = _activeEntries[i];
+        if (!entry.active) continue;
+        if (entry.track == track.index) {
+          totalSpeed += entry.speed;
           count++;
-          if (youngestComp == null || comp.position.x > youngestComp.position.x) {
-            youngestComp = comp;
+          if (youngestEntry == null || entry.x > youngestEntry.x) {
+            youngestEntry = entry;
           }
         }
       }
@@ -243,9 +311,9 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       track.avgSpeed = count == 0 ? 0.0 : totalSpeed / count;
       track.density = size.x > 0 ? (count * 150.0) / size.x : 0.0;
 
-      if (youngestComp != null) {
-        track.lastRight = youngestComp.position.x + youngestComp.size.x;
-        track.lastEntry = youngestComp.entry;
+      if (youngestEntry != null) {
+        track.lastRight = youngestEntry.x + youngestEntry.width;
+        track.lastEntry = youngestEntry;
       } else {
         if (!track.locked) {
           track.lastRight = 0.0;
@@ -260,17 +328,35 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     }
   }
 
-  void recycleComponent(BarrageComponent component) {
-    _activeComponentCache.remove(component);
-    _pool.recycle(component);
+  void recycleComponent(BarrageEntry entry) {
+    _pool.recycle(entry);
+  }
+
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+    if (!_initialized) return;
+
+    final int len = _activeEntries.length;
+    for (int i = 0; i < len; i++) {
+      final entry = _activeEntries[i];
+      if (!entry.active || entry.picture == null) continue;
+      canvas.save();
+      canvas.translate(entry.x, entry.y);
+      canvas.drawPicture(entry.picture!);
+      canvas.restore();
+    }
   }
 
   void clear() {
     _waiting.clear();
     _pictureCache.clear();
-    final activeComponents = List<BarrageComponent>.from(_activeComponentCache);
-    _activeComponentCache.clear();
-    removeAll(activeComponents);
+    for (var e in _activeEntries) {
+      _pool.recycle(e);
+    }
+    _activeEntries.clear();
+    _backbufferEntries.clear();
+    _pool.clear();
     for (final track in _trackManager.tracks) {
       track.lastRight = 0.0;
       track.lastEntry = null;
@@ -286,8 +372,8 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       _config.fontSize,
       _config.fontWeight.toString(),
       _config.textColor.toARGB32(),
-      _config.emojiSize,
-    ].join('_');
+      config.emojiSize,
+    ].join('');
   }
 
   @override
@@ -295,7 +381,11 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     _waiting.clear();
     _pictureCache.clear();
     _trackManager.tracks.clear();
-    _activeComponentCache.clear();
+    for (var e in _activeEntries) {
+      _pool.recycle(e);
+    }
+    _activeEntries.clear();
+    _backbufferEntries.clear();
     _pool.clear();
     super.onRemove();
   }

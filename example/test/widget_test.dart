@@ -36,7 +36,7 @@ void main() {
     late BarrageController controller;
 
     setUp(() {
-      baseConfig = const BarrageConfig(trackHeight: 40, maxTrackCount: 5, normalEmitInterval: 0.1, maxVisibleCount: 10);
+      baseConfig = const BarrageConfig(trackHeight: 40, maxVisibleCount: 10);
       controller = BarrageController();
     });
 

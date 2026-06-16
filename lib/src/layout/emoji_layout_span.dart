@@ -12,22 +12,22 @@ class EmojiLayoutSpan extends LayoutSpan {
     this.player,
   });
 
+  static final ui.Paint _sharedEmojiPaint = ui.Paint()
+    ..isAntiAlias = true
+    ..filterQuality = ui.FilterQuality.low;
+
   final ui.Image image;
   final SpriteAnimationPlayer? player;
 
   @override
   void paint(ui.Canvas canvas) {
-    final paint = ui.Paint()
-      ..isAntiAlias = true
-      ..filterQuality = ui.FilterQuality.medium;
-
     final dstRect = ui.Rect.fromLTWH(x, y, width, height);
 
     if (player != null) {
-      player!.paint(canvas, dstRect, paint);
+      player!.paint(canvas, dstRect, _sharedEmojiPaint);
     } else {
       final srcRect = ui.Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
-      canvas.drawImageRect(image, srcRect, dstRect, paint);
+      canvas.drawImageRect(image, srcRect, dstRect, _sharedEmojiPaint);
     }
   }
 }

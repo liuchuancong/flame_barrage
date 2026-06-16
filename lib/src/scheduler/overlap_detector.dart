@@ -4,18 +4,18 @@ class OverlapDetector {
   const OverlapDetector();
 
   bool canEnter(BarrageEntry current, BarrageEntry last, double screenWidth, {required double safeGap}) {
-    final lastTailX = last.x + last.width;
+    final double lastTailX = last.x + last.width;
 
     if (lastTailX + safeGap > screenWidth) {
       return false;
     }
 
     if (current.speed > last.speed) {
-      final lastRemainingTime = lastTailX / last.speed;
-      final relativeDistance = screenWidth - lastTailX + safeGap;
-      final catchUpTime = relativeDistance / (current.speed - last.speed);
+      final double realRelativeDistance = screenWidth - lastTailX;
+      final double catchUpTime = realRelativeDistance / (current.speed - last.speed);
+      final double lastRemainingTime = lastTailX / last.speed;
 
-      if (catchUpTime < lastRemainingTime) {
+      if (catchUpTime - (safeGap / current.speed) < lastRemainingTime) {
         return false;
       }
     }

@@ -1,53 +1,57 @@
-import 'package:flame_barrage/flame_barrage.dart';
+import '../core/barrage_config.dart';
+import '../model/barrage/barrage_track.dart';
+import '../model/barrage/barrage_entry.dart';
 
 class TrackAllocator {
-  const TrackAllocator({this.detector = const OverlapDetector()});
-
-  final OverlapDetector detector;
+  const TrackAllocator();
 
   int allocate({
     required List<BarrageTrack> tracks,
     required BarrageEntry current,
     required double screenWidth,
-    required bool massiveMode,
     required BarrageConfig config,
   }) {
-    int bestIndex = -1;
-    double bestScore = double.infinity;
-    final isScroll = current.item.type == BarrageType.scroll;
+    if (tracks.isEmpty) return -1;
 
-    final len = tracks.length;
+    int bestTrack = -1;
+    double minPenalty = double.infinity;
+
+    final int len = tracks.length;
     for (int i = 0; i < len; i++) {
       final track = tracks[i];
+      if (track.locked) continue;
 
-      if (!isScroll && track.locked) {
-        continue;
-      }
-
-      if (!massiveMode && track.activeCount >= 10) {
-        continue;
+      if (track.activeCount == 0) {
+        return i;
       }
 
       final last = track.lastEntry;
-      if (last != null && isScroll) {
-        if (!detector.canEnter(current, last, screenWidth, safeGap: config.overlapSafeGap)) {
+      if (last != null) {
+        final double lastRight = track.lastRight;
+        if (lastRight + config.overlapSafeGap > screenWidth) {
           continue;
+        }
+
+        final double currentSpeed = config.baseSpeed;
+        if (currentSpeed > last.speed) {
+          final double lastTailX = lastRight;
+          final double catchUpDistance = screenWidth - lastTailX;
+          final double catchUpTime = catchUpDistance / (currentSpeed - last.speed);
+          final double lastRemainingTime = lastTailX / last.speed;
+
+          if (catchUpTime < lastRemainingTime) {
+            continue;
+          }
         }
       }
 
-      final lastRight = last != null ? (last.x + last.width) : 0.0;
-      final safeGap = (screenWidth - lastRight).clamp(0.0, 200.0);
-
-      final densityPenalty = track.density * 100.0;
-      final speedPenalty = (1.0 / (track.avgSpeed + 1.0)) * 50.0;
-      final score = densityPenalty + speedPenalty - safeGap;
-
-      if (score < bestScore) {
-        bestScore = score;
-        bestIndex = track.index;
+      final double penalty = track.activeCount * 10.0 + track.avgSpeed * 0.1;
+      if (penalty < minPenalty) {
+        minPenalty = penalty;
+        bestTrack = i;
       }
     }
 
-    return bestIndex;
+    return bestTrack;
   }
 }

@@ -1,21 +1,48 @@
-import 'package:flame_barrage/flame_barrage.dart';
+import '../core/barrage_config.dart';
+import '../model/barrage/barrage_track.dart';
 
 class TrackManager {
-  final List<BarrageTrack> tracks = [];
+  final List<BarrageTrack> _tracks = [];
+  List<BarrageTrack> get tracks => _tracks;
 
-  void initialize(BarrageConfig config, double height) {
-    tracks.clear();
+  double _lastHeight = -1.0;
+  int _lastMaxTracks = -1;
 
-    final availableHeight = height * config.area;
-    final count = (availableHeight / config.trackHeight).floor();
-    final trackCount = count.clamp(1, config.maxTrackCount);
+  void initialize(BarrageConfig config, double screenHeight) {
+    if (screenHeight <= 0) return;
 
-    for (var i = 0; i < trackCount; i++) {
-      tracks.add(BarrageTrack(index: i));
+    final double safeTrackHeight = config.trackHeight < (config.fontSize + 10)
+        ? (config.fontSize + 10)
+        : config.trackHeight;
+
+    final double usableHeight = screenHeight * config.area;
+    int calculatedTracks = (usableHeight / safeTrackHeight).floor();
+
+    if (calculatedTracks <= 0) calculatedTracks = 1;
+
+    if (_lastHeight == screenHeight && _lastMaxTracks == calculatedTracks && _tracks.length == calculatedTracks) {
+      return;
+    }
+
+    _lastHeight = screenHeight;
+    _lastMaxTracks = calculatedTracks;
+
+    final Map<int, BarrageTrack> oldTracksMap = {for (var t in _tracks) t.index: t};
+    _tracks.clear();
+
+    for (int i = 0; i < calculatedTracks; i++) {
+      final oldTrack = oldTracksMap[i];
+      if (oldTrack != null) {
+        _tracks.add(oldTrack);
+      } else {
+        _tracks.add(BarrageTrack(index: i));
+      }
     }
   }
 
-  void clear() {
-    tracks.clear();
+  void forceRefresh(BarrageConfig config, double screenHeight) {
+    _lastHeight = -1.0;
+    _lastMaxTracks = -1;
+    initialize(config, screenHeight);
   }
 }

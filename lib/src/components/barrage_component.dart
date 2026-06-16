@@ -9,7 +9,6 @@ class BarrageComponent extends PositionComponent with HasGameReference<BarrageEn
     position = Vector2(entry.x, entry.y);
   }
 
-  static final Paint _opacityPaint = Paint();
   BarrageEntry entry;
   Picture picture;
   Duration fixedDuration;
@@ -52,23 +51,14 @@ class BarrageComponent extends PositionComponent with HasGameReference<BarrageEn
 
   @override
   void render(Canvas canvas) {
-    final currentOpacity = opacity;
-    if (currentOpacity <= 0.0) return;
-    if (currentOpacity >= 1.0) {
-      canvas.drawPicture(picture);
-      return;
-    }
-
-    _opacityPaint.colorFilter = ColorFilter.mode(Color.fromRGBO(0, 0, 0, currentOpacity), BlendMode.dstIn);
-    canvas.saveLayer(Rect.fromLTWH(0, 0, size.x, size.y), _opacityPaint);
+    if (opacity <= 0.0) return;
     canvas.drawPicture(picture);
-    canvas.restore();
   }
 
   @override
   void onRemove() {
     if (game.isMounted) {
-      game.recycleComponent(this);
+      game.recycleComponent(entry);
     }
     super.onRemove();
   }

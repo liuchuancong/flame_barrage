@@ -18,9 +18,17 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
   void initState() {
     super.initState();
     _fpsMonitor.start((fps) {
-      setState(() {
-        _currentFps = fps;
-      });
+      if (mounted) {
+        setState(() {
+          _currentFps = fps;
+        });
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (int i = 0; i < 3; i++) {
+        _controller.send(const BarrageItem(content: '🚀 引擎监测总线已激活 - 帧率度量就绪', type: BarrageType.scroll));
+      }
     });
   }
 
@@ -33,65 +41,124 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
 
   void _triggerPerformanceProfile() {
     Measure.profile('BulkEmissionPipeline', () {
-      for (int i = 0; i < 50; i++) {
-        _controller.send(const BarrageItem(content: '压测流水线运作中 - 实时监听核心控制台参数变动', type: BarrageType.scroll));
+      for (int i = 0; i < 60; i++) {
+        _controller.send(const BarrageItem(content: '💥 高负载极端能耗压测流水线运作中...', type: BarrageType.scroll));
       }
     });
   }
 
+  Future<void> _openConfigPanelAndListen() async {
+    await Navigator.pushNamed(context, '/config_panel');
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentConfig = BarrageRouter.globalConfig;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('性能大盘与配置全局同步')),
+      backgroundColor: const Color(0xFF141414),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: const Color(0xFF1F1F1F),
+        title: const Text(
+          '内核性能度量与全局参数同步',
+          style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune_rounded, color: Colors.orangeAccent),
+            onPressed: _openConfigPanelAndListen,
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          Card(
-            margin: const EdgeInsets.all(12),
-            color: Colors.blueGrey,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Column(
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1F1F1F),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('引擎内核计算帧率', style: TextStyle(color: Colors.grey)),
+                      const Text('渲染引擎实时帧率 (FPS)', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                      const SizedBox(height: 6),
                       Text(
-                        '${_currentFps.toStringAsFixed(1)} FPS',
+                        '${_currentFps.toStringAsFixed(1)} Hz',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 28,
+                          fontFamily: 'monospace',
                           fontWeight: FontWeight.bold,
-                          color: _currentFps > 55 ? Colors.green : Colors.orange,
+                          color: _currentFps > 55 ? Colors.greenAccent : Colors.orangeAccent,
                         ),
                       ),
                     ],
                   ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-                    onPressed: _triggerPerformanceProfile,
-                    icon: const Icon(Icons.speed),
-                    label: const Text('度量高能耗时 (Measure)'),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF722ED1),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                ],
-              ),
+                  onPressed: _triggerPerformanceProfile,
+                  icon: const Icon(Icons.bolt, size: 16),
+                  label: const Text('度量耗时 (Measure)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                ),
+              ],
             ),
           ),
           Expanded(
             child: Container(
-              margin: const EdgeInsets.all(12),
-              decoration: BoxDecoration(border: Border.all(color: Colors.white24)),
-              child: FlameBarrageWidget(
-                config: BarrageRouter.globalConfig,
-                emojiAtlas: EmojiAtlas.instance,
-                controller: _controller,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: FlameBarrageWidget(
+                  config: currentConfig,
+                  emojiAtlas: EmojiAtlas.instance,
+                  controller: _controller,
+                ),
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              '当前全局字体设定: ${BarrageRouter.globalConfig.fontSize}px  |  最大轨道: ${BarrageRouter.globalConfig.maxTrackCount} 轨',
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '当前同步内核配置：字号 ${currentConfig.fontSize}px | 轨道高度 ${currentConfig.trackHeight}px',
+                      style: const TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'monospace'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

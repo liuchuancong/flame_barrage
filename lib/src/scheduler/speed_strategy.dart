@@ -1,28 +1,38 @@
 import '../core/barrage_config.dart';
-import '../model/barrage/barrage_entry.dart';
 import '../model/barrage/barrage_track.dart';
+import '../model/barrage/barrage_entry.dart';
 
 class SpeedStrategy {
   const SpeedStrategy();
 
   double calculate(
-    BarrageEntry entry,
+    BarrageEntry current,
     double screenWidth,
     BarrageConfig config, {
-    BarrageTrack? targetTrack,
-    bool massiveMode = false,
+    required BarrageTrack targetTrack,
   }) {
-    final distance = screenWidth + entry.width;
-    double calculatedSpeed = (distance / config.scrollDuration.inMilliseconds) * 1000.0;
-
-    if (massiveMode) {
-      calculatedSpeed *= 1.3;
+    final last = targetTrack.lastEntry;
+    if (last == null) {
+      return config.baseSpeed;
     }
 
-    if (calculatedSpeed < config.baseSpeed) {
-      calculatedSpeed = config.baseSpeed;
+    if (config.baseSpeed <= last.speed) {
+      return config.baseSpeed;
     }
 
-    return calculatedSpeed;
+    final double lastRight = targetTrack.lastRight;
+    final double catchUpDistance = screenWidth - lastRight;
+    final double lastRemainingTime = lastRight / last.speed;
+
+    if (lastRemainingTime <= 0) {
+      return config.baseSpeed;
+    }
+
+    final double maxAllowedSpeed = last.speed + (catchUpDistance / lastRemainingTime);
+    if (config.baseSpeed > maxAllowedSpeed) {
+      return last.speed * 0.95;
+    }
+
+    return config.baseSpeed;
   }
 }

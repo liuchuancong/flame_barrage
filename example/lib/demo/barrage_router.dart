@@ -12,13 +12,7 @@ import 'barrage_config_panel_screen.dart';
 import 'package:flame_barrage/flame_barrage.dart';
 
 class BarrageRouter {
-  static BarrageConfig globalConfig = const BarrageConfig(
-    trackHeight: 40,
-    maxTrackCount: 10,
-    normalEmitInterval: 0.1,
-    massiveEmitInterval: 0.02,
-    maxVisibleCount: 150,
-  );
+  static BarrageConfig globalConfig = const BarrageConfig(trackHeight: 40, maxVisibleCount: 150);
 
   static Map<String, WidgetBuilder> getRoutes() {
     return {

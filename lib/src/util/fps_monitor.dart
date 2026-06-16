@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/scheduler.dart';
 
 typedef FpsCallback = void Function(double fps);
 
@@ -6,51 +6,47 @@ class FpsMonitor {
   FpsMonitor({this.sampleDuration = const Duration(seconds: 1)});
 
   final Duration sampleDuration;
-
   FpsCallback? _onFpsUpdated;
   bool _isListening = false;
-  bool _hasRegisteredCallback = false;
-  int _lastTimestamp = 0;
-  int _frameCount = 0;
+
+  final List<double> _frameTimestamps = [];
 
   void start(FpsCallback onFpsUpdated) {
-    _onFpsUpdated = onFpsUpdated;
-    _lastTimestamp = DateTime.now().millisecondsSinceEpoch;
-    _frameCount = 0;
-
     if (_isListening) return;
+    _onFpsUpdated = onFpsUpdated;
     _isListening = true;
+    _frameTimestamps.clear();
 
-    if (!_hasRegisteredCallback) {
-      _hasRegisteredCallback = true;
-      WidgetsBinding.instance.addPersistentFrameCallback(_onFrame);
-    }
+    SchedulerBinding.instance.addPostFrameCallback(_onHardwareTick);
   }
 
   void stop() {
     _isListening = false;
     _onFpsUpdated = null;
+    _frameTimestamps.clear();
   }
 
-  void _onFrame(Duration timeStamp) {
+  void _onHardwareTick(Duration timestamp) {
     if (!_isListening) return;
 
-    _frameCount++;
-    final int now = DateTime.now().millisecondsSinceEpoch;
-    final int delta = now - _lastTimestamp;
+    final double currentMs = timestamp.inMicroseconds / 1000.0;
+    _frameTimestamps.add(currentMs);
 
-    if (delta >= sampleDuration.inMilliseconds) {
-      final double fps = (_frameCount * 1000.0) / delta;
-      final double clampedFps = fps.clamp(0.0, 60.0);
+    final double windowStartMs = currentMs - sampleDuration.inMilliseconds;
+    _frameTimestamps.removeWhere((t) => t < windowStartMs);
 
-      _onFpsUpdated?.call(clampedFps);
+    if (_frameTimestamps.length >= 2) {
+      final int frameCount = _frameTimestamps.length;
+      final double totalDurationSec = (_frameTimestamps.last - _frameTimestamps.first) / 1000.0;
 
-      _lastTimestamp = now;
-      _frameCount = 0;
+      if (totalDurationSec > 0) {
+        final double realHardwareFps = (frameCount - 1) / totalDurationSec;
+        _onFpsUpdated?.call(realHardwareFps.clamp(0.0, 144.0));
+      }
     }
 
     if (_isListening) {
-      WidgetsBinding.instance.scheduleFrame();
+      SchedulerBinding.instance.addPostFrameCallback(_onHardwareTick);
     }
   }
 }
