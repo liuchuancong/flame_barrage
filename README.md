@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="FlameBarrage Engine Logo" width="720">
+  <img src="https://raw.githubusercontent.com/liuchuancong/flame_barrage/refs/heads/main/assets/logo/logo.png" alt="FlameBarrage Engine Logo" width="720">
 </p>
 
 <h1 align="center">🔥 FlameBarrage Engine</h1>
