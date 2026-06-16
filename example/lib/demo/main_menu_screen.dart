@@ -29,6 +29,14 @@ class MainMenuScreen extends StatelessWidget {
           ),
           _buildMenuListRow(
             context,
+            icon: Icons.format_size_rounded,
+            title: 'BarrageItem 单条样式自定义测试',
+            subtitle: '测试单条弹幕独立 fontFamily、字号、字重、描边、速度等覆盖全局配置',
+            route: '/item_style_demo',
+            color: const Color(0xFF722ED1),
+          ),
+          _buildMenuListRow(
+            context,
             icon: Icons.crop_landscape_rounded,
             title: '多屏幕共用单控制器演示',
             subtitle: '全屏/小窗互斥切换，共用同一个BarrageController，无多引擎遍历',
