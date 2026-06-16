@@ -202,14 +202,26 @@ class MixedLayout {
         ..isAntiAlias = true;
 
       builder.pushStyle(
-        ui.TextStyle(foreground: strokePaint, fontSize: config.fontSize, fontWeight: config.fontWeight),
+        ui.TextStyle(
+          foreground: strokePaint,
+          fontSize: config.fontSize,
+          fontWeight: config.fontWeight,
+          fontFamily: config.fontFamily,
+        ),
       );
     } else {
       final textPaint = ui.Paint()
         ..color = config.textColor
         ..isAntiAlias = true;
 
-      builder.pushStyle(ui.TextStyle(foreground: textPaint, fontSize: config.fontSize, fontWeight: config.fontWeight));
+      builder.pushStyle(
+        ui.TextStyle(
+          foreground: textPaint,
+          fontSize: config.fontSize,
+          fontWeight: config.fontWeight,
+          fontFamily: config.fontFamily,
+        ),
+      );
     }
 
     builder.addText(text);
@@ -231,6 +243,7 @@ class MixedLayout {
     hash = 37 * hash + priority.hashCode;
     hash = 37 * hash + config.showStroke.hashCode;
     hash = 37 * hash + config.strokeColor.toARGB32().hashCode;
+    hash = 37 * hash + config.fontFamily.hashCode;
 
     final len = fragments.length;
     for (int i = 0; i < len; i++) {

@@ -244,25 +244,37 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     if (_waiting.isEmpty) return;
 
     if (_currentAliveCount >= _config.maxVisibleCount) return;
+    final item = _waiting.first;
+    final resolvedConfig = _config.copyWith(
+      textColor: item.textColor,
+      fontSize: item.fontSize,
+      fontWeight: item.fontWeight,
+      fontFamily: item.fontFamily,
+      showStroke: item.showStroke,
+      strokeColor: item.strokeColor,
+      strokeWidth: item.strokeWidth,
+      emojiSize: item.emojiSize,
+      baseSpeed: item.baseSpeed,
+      overlapSafeGap: item.overlapSafeGap,
+    );
 
-    _trackManager.initialize(_config, _calculateAllowedHeight(size.y));
+    _trackManager.initialize(resolvedConfig, _calculateAllowedHeight(size.y));
     if (_trackManager.tracks.isEmpty) return;
 
-    final item = _waiting.first;
     final fragments = _parser.parse(item.content);
-    final layoutResult = _layout.layout(fragments, item: item, config: _config);
+    final layoutResult = _layout.layout(fragments, item: item, config: resolvedConfig);
 
     final mockEntry = _pool.obtain(item: item, creationTime: DateTime.now().millisecondsSinceEpoch)
       ..width = layoutResult.width
       ..height = layoutResult.height;
 
-    mockEntry.speed = item.type == BarrageType.scroll ? _config.baseSpeed : 0.0;
+    mockEntry.speed = item.type == BarrageType.scroll ? resolvedConfig.baseSpeed : 0.0;
 
     final trackIndex = _trackAllocator.allocate(
       tracks: _trackManager.tracks,
       current: mockEntry,
       screenWidth: size.x,
-      config: _config,
+      config: resolvedConfig,
     );
 
     if (trackIndex == -1) {
@@ -282,10 +294,11 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       picture = _renderer.buildPicture(layoutResult);
       _pictureCache.put(cacheKey, picture);
     }
-
     double startX = size.x;
     double startY =
-        _getTopOffset() + (trackIndex * _config.trackHeight) + (_config.trackHeight - layoutResult.height) / 2;
+        _getTopOffset() +
+        (trackIndex * resolvedConfig.trackHeight) +
+        (resolvedConfig.trackHeight - layoutResult.height) / 2;
 
     if (item.type != BarrageType.scroll) {
       track.locked = true;
@@ -294,8 +307,8 @@ class BarrageEngine extends FlameGame with TapCallbacks {
         startY =
             size.y -
             _getBottomOffset() -
-            ((trackIndex + 1) * _config.trackHeight) +
-            (_config.trackHeight - layoutResult.height) / 2;
+            ((trackIndex + 1) * resolvedConfig.trackHeight) +
+            (resolvedConfig.trackHeight - layoutResult.height) / 2;
       }
     }
 
@@ -412,10 +425,11 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     return [
       item.content,
       item.type.name,
-      _config.fontSize,
-      _config.fontWeight.toString(),
-      _config.textColor.toARGB32(),
-      config.emojiSize,
+      item.fontSize ?? _config.fontSize,
+      (item.fontWeight ?? _config.fontWeight).toString(),
+      (item.textColor ?? _config.textColor).toARGB32(),
+      item.emojiSize ?? _config.emojiSize,
+      item.fontFamily ?? '',
     ].join('');
   }
 
