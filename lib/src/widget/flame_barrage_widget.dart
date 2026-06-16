@@ -80,6 +80,6 @@ class _FlameBarrageWidgetState extends State<FlameBarrageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(child: GameWidget(game: _engine));
+    return GameWidget(game: _engine);
   }
 }

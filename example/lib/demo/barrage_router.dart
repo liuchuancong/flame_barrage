@@ -11,8 +11,8 @@ import 'sprite_sheet_demo_screen.dart';
 import 'custom_effect_demo_screen.dart';
 import 'combo_animation_demo_screen.dart';
 import 'barrage_config_panel_screen.dart';
+import 'barrage_item_style_demo_screen.dart';
 import 'package:flame_barrage/flame_barrage.dart';
-import 'package:example/demo/barrage_item_style_demo_screen.dart';
 
 class BarrageRouter {
   static BarrageConfig globalConfig = const BarrageConfig(trackHeight: 40, maxVisibleCount: 150);

@@ -416,6 +416,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
 
   void clear() {
     _waiting.clear();
+    // 清空暂停缓存
     _pausedBuffer.clear();
     _pictureCache.clear();
     for (var e in _activeEntries) {
