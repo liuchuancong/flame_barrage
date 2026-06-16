@@ -1,14 +1,39 @@
-/// 表情包资产的来源与渲染类型
-enum EmojiSourceType {
-  /// 本地独立静态图片 (单个文件，如 assets/doge.png)
-  asset,
+abstract class EmojiSourceType {
+  const EmojiSourceType(this.name);
+  final String name;
 
-  /// 大图集裁剪 (从整张大贴图中通过指定区域坐标获取 不等宽不等高、不规则紧凑排布)
-  atlas,
+  bool get shouldCacheInMemory;
 
-  /// 网络下载 (通过 URL 异步下载并缓存于本地的单图)
-  network,
+  static const EmojiSourceType asset = AssetSourceType();
+  static const EmojiSourceType atlas = AtlasSourceType();
+  static const EmojiSourceType network = NetworkSourceType();
+  static const EmojiSourceType animated = AnimatedSourceType();
+}
 
-  ///  动态序列帧雪碧图 (多帧合一的横图，等宽等高、规则排列)
-  animated,
+class AssetSourceType extends EmojiSourceType {
+  const AssetSourceType() : super('asset');
+
+  @override
+  bool get shouldCacheInMemory => true;
+}
+
+class AtlasSourceType extends EmojiSourceType {
+  const AtlasSourceType() : super('atlas');
+
+  @override
+  bool get shouldCacheInMemory => true;
+}
+
+class NetworkSourceType extends EmojiSourceType {
+  const NetworkSourceType() : super('network');
+
+  @override
+  bool get shouldCacheInMemory => false;
+}
+
+class AnimatedSourceType extends EmojiSourceType {
+  const AnimatedSourceType() : super('animated');
+
+  @override
+  bool get shouldCacheInMemory => true;
 }

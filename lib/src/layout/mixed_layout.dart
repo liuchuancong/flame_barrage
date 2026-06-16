@@ -54,7 +54,8 @@ class MixedLayout {
       final fragment = fragments[i];
 
       if (fragment is TextFragment) {
-        final textCacheKey = '${fragment.text}|$fontSize|$colorValue|$showStroke';
+        final textCacheKey =
+            '${fragment.text}|${config.fontSize}|$colorValue|$showStroke|${config.fontWeight.toString()}';
         final strokeCacheKey = '${fragment.text}|$fontSize|${config.strokeColor.toARGB32()}|$showStroke';
 
         final paragraph = _buildParagraph(fragment.text, config, textCacheKey, isStroke: false);

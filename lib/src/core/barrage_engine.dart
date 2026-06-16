@@ -409,7 +409,14 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   }
 
   String buildCacheKey(BarrageItem item) {
-    return [item.content, item.type.name].join('');
+    return [
+      item.content,
+      item.type.name,
+      _config.fontSize,
+      _config.fontWeight.toString(),
+      _config.textColor.toARGB32(),
+      config.emojiSize,
+    ].join('');
   }
 
   @override

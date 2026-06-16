@@ -50,7 +50,6 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
   void initState() {
     super.initState();
     _loadConfigValues(widget.initialConfig);
-    _startLiveFloodPump();
   }
 
   void _loadConfigValues(BarrageConfig config) {
@@ -77,31 +76,6 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
     _barragePoolMaxSize = config.barragePoolMaxSize;
     _pictureCacheMaxSize = config.pictureCacheMaxSize;
     _textCacheMaxSize = config.textCacheMaxSize;
-  }
-
-  void _startLiveFloodPump() {
-    _floodTimer?.cancel();
-    _floodTimer = Timer.periodic(const Duration(milliseconds: 33), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      _floodIndex++;
-
-      final currentFontSize = _fontSize;
-      final currentTrackHeight = _trackHeight;
-      BarrageLogger.w(
-        'BarrageConfigPanelScreen',
-        '⚙️ 物理管线实时热更新 #$_floodIndex -> 当前字号:${currentFontSize.toInt()}px | 物理轨道:${currentTrackHeight.toInt()}px',
-      );
-      _controller.send(
-        BarrageItem(
-          content:
-              '⚙️ 物理管线实时热更新 #$_floodIndex -> 当前字号:${currentFontSize.toInt()}px | 物理轨道:${currentTrackHeight.toInt()}px',
-          type: BarrageType.scroll,
-        ),
-      );
-    });
   }
 
   BarrageConfig _buildCurrentLiveConfig() {
@@ -190,6 +164,30 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orangeAccent,
+                foregroundColor: Colors.black,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.rocket_launch_rounded, size: 20),
+              label: Text('发射当前配置验证弹幕 (当前字号: ${_fontSize.toInt()}px)'),
+              onPressed: () {
+                _floodIndex++;
+                _controller.send(
+                  BarrageItem(
+                    content:
+                        '⚙️ 物理管线瞬时点射 #$_floodIndex -> 当前字号:${_fontSize.toInt()}px | 物理轨道:${_trackHeight.toInt()}px | 实时速度:${_baseSpeed.toInt()}px/s',
+                    type: BarrageType.scroll,
+                  ),
+                );
+              },
+            ),
+          ),
+
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(16.0),
