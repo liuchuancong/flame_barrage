@@ -46,7 +46,7 @@ class MainMenuScreen extends StatelessWidget {
           _buildMenuListRow(
             context,
             icon: Icons.grid_view_rounded,
-            title: '大图集网格对齐裁剪',
+            title: '雪碧大图对齐裁剪',
             subtitle: 'CSS雪碧大图物理网格自动无损切片，高性能纹理映射',
             route: '/spritesheet',
             color: const Color(0xFF13C2C2),

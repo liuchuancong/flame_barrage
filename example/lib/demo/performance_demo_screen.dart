@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'barrage_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flame_barrage/flame_barrage.dart';
@@ -13,6 +14,9 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
   final BarrageController _controller = BarrageController();
   final FpsMonitor _fpsMonitor = FpsMonitor(sampleDuration: const Duration(milliseconds: 500));
   double _currentFps = 60.0;
+  Timer? _stressTimer;
+  bool _isStressTesting = false;
+  int _stressMessageIndex = 0;
 
   @override
   void initState() {
@@ -34,17 +38,34 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
 
   @override
   void dispose() {
+    _stressTimer?.cancel();
     _fpsMonitor.stop();
     _controller.detach();
     super.dispose();
   }
 
-  void _triggerPerformanceProfile() {
-    Measure.profile('BulkEmissionPipeline', () {
-      for (int i = 0; i < 60; i++) {
-        _controller.send(const BarrageItem(content: '💥 高负载极端能耗压测流水线运作中...', type: BarrageType.scroll));
-      }
+  void _toggleStressTest() {
+    setState(() {
+      _isStressTesting = !_isStressTesting;
     });
+
+    if (_isStressTesting) {
+      _stressTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+        Measure.profile('BulkEmissionPipeline', () {
+          for (int i = 0; i < 30; i++) {
+            _stressMessageIndex++;
+            _controller.send(
+              BarrageItem(
+                content: '🔥 300发/s极限压测 💥 [流水线No.$_stressMessageIndex] - 实时测试硬件吞吐量线',
+                type: BarrageType.scroll,
+              ),
+            );
+          }
+        });
+      });
+    } else {
+      _stressTimer?.cancel();
+    }
   }
 
   Future<void> _openConfigPanelAndListen() async {
@@ -111,14 +132,17 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF722ED1),
+                    backgroundColor: _isStressTesting ? Colors.redAccent : const Color(0xFF722ED1),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: _triggerPerformanceProfile,
-                  icon: const Icon(Icons.bolt, size: 16),
-                  label: const Text('度量耗时 (Measure)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  onPressed: _toggleStressTest,
+                  icon: Icon(_isStressTesting ? Icons.stop_circle_outlined : Icons.bolt, size: 16),
+                  label: Text(
+                    _isStressTesting ? '停止压测泵' : '开启300发/s压测',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -134,6 +158,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: FlameBarrageWidget(
+                  key: ValueKey(currentConfig.hashCode),
                   config: currentConfig,
                   emojiAtlas: EmojiAtlas.instance,
                   controller: _controller,

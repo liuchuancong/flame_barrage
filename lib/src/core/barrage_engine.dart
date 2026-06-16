@@ -2,19 +2,7 @@ import 'dart:ui';
 import 'dart:collection';
 import 'package:flame/game.dart';
 import 'package:flame/events.dart';
-import '../atlas/emoji_atlas.dart';
-import '../pool/barrage_pool.dart';
-import '../layout/rich_parser.dart';
-import '../cache/picture_cache.dart';
-import '../core/barrage_config.dart';
-import '../layout/mixed_layout.dart';
-import '../scheduler/track_manager.dart';
-import '../scheduler/speed_strategy.dart';
-import '../scheduler/track_allocator.dart';
-import '../model/barrage/barrage_item.dart';
-import '../model/barrage/barrage_type.dart';
-import '../model/barrage/barrage_entry.dart';
-import '../render/barrage/mixed_renderer.dart';
+import 'package:flame_barrage/flame_barrage.dart';
 import 'package:flutter/material.dart' show Colors;
 
 class BarrageEngine extends FlameGame with TapCallbacks {
@@ -42,10 +30,10 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   final BarragePool _pool;
 
   final Queue<BarrageItem> _waiting = Queue<BarrageItem>();
-
-  // 巅峰优化：双常驻数组指针原地互换，终结任何 List.from() 的堆申请和 GC 海啸
   List<BarrageEntry> _activeEntries = [];
   List<BarrageEntry> _backbufferEntries = [];
+
+  int _currentAliveCount = 0;
 
   double _emitTimer = 0.0;
   double _metricTimer = 0.0;
@@ -195,10 +183,10 @@ class BarrageEngine extends FlameGame with TapCallbacks {
           _backbufferEntries.add(entry);
         } else {
           _pool.recycle(entry);
+          _currentAliveCount--;
         }
       }
 
-      // 0 开销原地互换指针：完全避免了重新 new 数组的开销，GC 抖动彻底归 0，闪烁彻底死锁解决！
       final List<BarrageEntry> temp = _activeEntries;
       _activeEntries = _backbufferEntries;
       _backbufferEntries = temp;
@@ -214,12 +202,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   void _dispatchWaiting() {
     if (_waiting.isEmpty) return;
 
-    int aliveCount = 0;
-    final int currentLen = _activeEntries.length;
-    for (int i = 0; i < currentLen; i++) {
-      if (_activeEntries[i].active) aliveCount++;
-    }
-    if (aliveCount >= _config.maxVisibleCount) return;
+    if (_currentAliveCount >= _config.maxVisibleCount) return;
 
     _trackManager.initialize(_config, size.y);
     if (_trackManager.tracks.isEmpty) return;
@@ -284,6 +267,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     track.activeCount++;
 
     _activeEntries.add(mockEntry);
+    _currentAliveCount++;
   }
 
   void _updateTrackMetrics() {
@@ -357,6 +341,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     _activeEntries.clear();
     _backbufferEntries.clear();
     _pool.clear();
+    _currentAliveCount = 0;
     for (final track in _trackManager.tracks) {
       track.lastRight = 0.0;
       track.lastEntry = null;
@@ -387,6 +372,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     _activeEntries.clear();
     _backbufferEntries.clear();
     _pool.clear();
+    _currentAliveCount = 0;
     super.onRemove();
   }
 }

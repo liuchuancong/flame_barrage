@@ -1,7 +1,4 @@
-import 'fragment.dart';
-import 'text_fragment.dart';
-import 'emoji_fragment.dart';
-import '../atlas/emoji_atlas.dart';
+import 'package:flame_barrage/flame_barrage.dart';
 
 class RichParser {
   RichParser({required this.atlas, this.maxCacheSize = 2000});
@@ -62,9 +59,13 @@ class RichParser {
 
       final key = match.group(0);
       if (key != null) {
-        final emoji = atlas.find(key);
-        if (emoji != null) {
-          result.add(EmojiFragment(emoji));
+        final emojiInfo = atlas.find(key);
+        if (emojiInfo != null) {
+          if (emojiInfo.sourceType == EmojiSourceType.atlas) {
+            result.add(SpriteFragment(key));
+          } else {
+            result.add(EmojiFragment(emojiInfo));
+          }
         } else {
           result.add(TextFragment(key));
         }

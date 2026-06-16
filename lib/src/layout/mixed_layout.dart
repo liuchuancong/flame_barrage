@@ -95,23 +95,37 @@ class MixedLayout {
           );
         }
         currentX += width;
-      } else if (fragment is EmojiFragment) {
+      } else if (fragment is SpriteFragment) {
         if (config.noEmojiMode) continue;
 
-        final image = atlas.image(fragment.emoji.id);
-        if (image == null) continue;
+        final emojiId = fragment.emojiId;
+        final sprite = atlas.getStaticSprite(emojiId);
+        if (sprite == null) continue;
 
-        final double width = config.emojiSize;
-        final double height = config.emojiSize;
+        final double spriteWidth = sprite.srcSize.x;
+        final double spriteHeight = sprite.srcSize.y;
+        final double scale = config.emojiSize / (spriteHeight > 0 ? spriteHeight : 24.0);
+        final double finalWidth = spriteWidth * scale;
+        final double finalHeight = spriteHeight * scale;
 
-        if (height > maxHeight) maxHeight = height;
+        if (finalHeight > maxHeight) maxHeight = finalHeight;
 
-        final animation = atlas.getAnimation(fragment.emoji.id);
+        final animation = atlas.getAnimation(emojiId);
         final player = animation != null ? SpriteAnimationPlayer(animation: animation) : null;
 
         _reusableSpans.add(
-          EmojiLayoutSpan(x: currentX, y: 0.0, width: width, height: height, image: image, player: player),
+          SpriteLayoutSpan(x: currentX, y: 0.0, width: finalWidth, height: finalHeight, sprite: sprite, player: player),
         );
+        currentX += finalWidth;
+      } else if (fragment is EmojiFragment) {
+        if (config.noEmojiMode) continue;
+        final emojiInfo = fragment.emoji;
+        final image = atlas.image(emojiInfo.id);
+        if (image == null) continue;
+        final double width = config.emojiSize;
+        final double height = config.emojiSize;
+        if (height > maxHeight) maxHeight = height;
+        _reusableSpans.add(EmojiLayoutSpan(x: currentX, y: 0.0, width: width, height: height, image: image));
         currentX += width;
       }
     }
@@ -130,6 +144,15 @@ class MixedLayout {
           text: span.text,
           paragraph: span.paragraph,
         );
+      } else if (span is SpriteLayoutSpan) {
+        return SpriteLayoutSpan(
+          x: span.x,
+          y: centeredY,
+          width: span.width,
+          height: span.height,
+          sprite: span.sprite,
+          player: span.player,
+        );
       } else {
         final emojiSpan = span as EmojiLayoutSpan;
         return EmojiLayoutSpan(
@@ -138,7 +161,6 @@ class MixedLayout {
           width: emojiSpan.width,
           height: emojiSpan.height,
           image: emojiSpan.image,
-          player: emojiSpan.player,
         );
       }
     });
@@ -152,7 +174,6 @@ class MixedLayout {
       return cached;
     }
 
-    // 终极优化：强制注入 height: 1.0 固定物理单行度量，暴砍 C++ 矢量字符探边开销
     final builder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: config.fontSize, height: 1.0));
     final textStyle = ui.TextStyle(fontSize: config.fontSize, fontWeight: config.fontWeight, color: config.textColor);
 
@@ -179,6 +200,8 @@ class MixedLayout {
       final fragment = fragments[i];
       if (fragment is TextFragment) {
         hash = 37 * hash + fragment.text.hashCode;
+      } else if (fragment is SpriteFragment) {
+        hash = 37 * hash + fragment.emojiId.hashCode;
       } else if (fragment is EmojiFragment) {
         hash = 37 * hash + fragment.emoji.id.hashCode;
       }
