@@ -1,4 +1,5 @@
 import 'main_menu_screen.dart';
+import 'miti_screen_barrage.dart';
 import 'asset_loading_screen.dart';
 import 'live_room_demo_screen.dart';
 import 'memory_profile_screen.dart';
@@ -33,6 +34,7 @@ class BarrageRouter {
           globalConfig = newConfig;
         },
       ),
+      '/multi_screen_barrage': (context) => const MultiScreenBarrageDemoScreen(),
     };
   }
 }

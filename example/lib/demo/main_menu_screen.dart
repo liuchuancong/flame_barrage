@@ -29,6 +29,14 @@ class MainMenuScreen extends StatelessWidget {
           ),
           _buildMenuListRow(
             context,
+            icon: Icons.crop_landscape_rounded,
+            title: '多屏幕共用单控制器演示',
+            subtitle: '全屏/小窗互斥切换，共用同一个BarrageController，无多引擎遍历',
+            route: '/multi_screen_barrage',
+            color: const Color(0xFF1890FF),
+          ),
+          _buildMenuListRow(
+            context,
             icon: Icons.touch_app_rounded,
             title: '交互式视频遮罩层',
             subtitle: '全视口手势层级拦截与 Canvas 反向矩阵碰撞精密检测',

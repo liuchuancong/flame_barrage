@@ -146,6 +146,16 @@ class _BarrageLiveBodyState extends State<BarrageLiveBody> {
     _controller.send(BarrageItem(content: tag, type: BarrageType.scroll, priority: 1));
   }
 
+  void _togglePauseEngine() {
+    if (!_isEngineReady) return;
+    if (_controller.running) {
+      _controller.pause();
+    } else {
+      _controller.resume();
+    }
+    setState(() {});
+  }
+
   @override
   void dispose() {
     _wsMockTimer?.cancel();
@@ -241,6 +251,13 @@ class _BarrageLiveBodyState extends State<BarrageLiveBody> {
                         style: ElevatedButton.styleFrom(backgroundColor: _isConnected ? Colors.red : Colors.green),
                         onPressed: _toggleWebSocketConnection,
                         child: Text(_isConnected ? '断开长连接' : '开启高并发长连接 (WS)'),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _controller.running ? Colors.blue : Colors.orange,
+                        ),
+                        onPressed: _togglePauseEngine,
+                        child: Text(_controller.running ? '暂停弹幕' : '恢复弹幕'),
                       ),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
