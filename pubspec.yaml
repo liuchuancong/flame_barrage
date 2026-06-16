@@ -1,6 +1,6 @@
 name: flame_barrage
 description: A high-performance barrage rendering engine powered by Flame.
-version: 0.0.1
+version: 0.0.2
 homepage: https://github.com/yourname/flame_barrage
 repository: https://github.com/yourname/flame_barrage
 issue_tracker: https://github.com/yourname/flame_barrage/issues

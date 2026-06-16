@@ -4,7 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
-## [0.0.1] - 2026-06-16
+## 0.0.2
+
+- Added GitHub Pages online demo.
+- Added English / Chinese README navigation.
+- Improved documentation.
+- Updated project branding and logo.
+
+## [0.0.1]
 
 ### Added
 
