@@ -1,4 +1,8 @@
 <p align="center">
+  <a href="./README.md">🇺🇸 English</a> |
+  <a href="./README_ZH.md">🇨🇳 简体中文</a>
+</p>
+<p align="center">
   <img src="https://raw.githubusercontent.com/liuchuancong/flame_barrage/refs/heads/main/assets/logo/logo.png" alt="FlameBarrage Engine Logo" width="720">
 </p>
 
@@ -14,7 +18,23 @@
   <img src="https://img.shields.io/badge/Flame-1.37+-orange.svg" alt="Flame">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
 </p>
+## 🎮 在线体验
 
+无需安装 Flutter 环境，直接在浏览器中体验 FlameBarrage：
+
+👉 **在线 Demo：**
+https://liuchuancong.github.io/flame_barrage/
+
+在线演示包含：
+
+- ⚡ 高性能弹幕渲染
+- 🎨 实时配置热更新
+- 😀 Emoji 混合排版
+- 🎁 Sprite Atlas 雪碧图动画
+- 👆 弹幕点击与长按交互
+- 📈 实时性能压测
+
+> 基于 Flutter Web 与 Flame Engine 构建。
 ---
 
 ## 🚀 项目简介

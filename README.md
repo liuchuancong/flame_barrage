@@ -1,4 +1,8 @@
 <p align="center">
+  <a href="./README.md">🇺🇸 English</a> |
+  <a href="./README_ZH.md">🇨🇳 简体中文</a>
+</p>
+<p align="center">
   <img src="https://raw.githubusercontent.com/liuchuancong/flame_barrage/refs/heads/main/assets/logo/logo.png" alt="FlameBarrage Engine Logo" width="720">
 </p>
 
@@ -9,11 +13,38 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/pub/v/flame_barrage.svg" alt="pub version">
-  <img src="https://img.shields.io/badge/Flutter-3.x-blue.svg" alt="Flutter">
-  <img src="https://img.shields.io/badge/Flame-1.37+-orange.svg" alt="Flame">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+  <a href="https://pub.dev/packages/flame_barrage">
+    <img src="https://img.shields.io/pub/v/flame_barrage.svg" alt="pub version">
+  </a>
+  <a href="https://github.com/liuchuancong/flame_barrage">
+    <img src="https://img.shields.io/badge/GitHub-Repository-black.svg" alt="GitHub">
+  </a>
+  <a href="https://liuchuancong.github.io/flame_barrage/">
+    <img src="https://img.shields.io/badge/Live-Demo-success.svg" alt="Demo">
+  </a>
+  <img src="https://img.shields.io/badge/Flutter-3.x-blue.svg">
+  <img src="https://img.shields.io/badge/Flame-1.37+-orange.svg">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg">
 </p>
+
+---
+
+## 🎮 Live Demo
+
+Experience FlameBarrage directly in your browser:
+
+👉 **Demo:** https://liuchuancong.github.io/flame_barrage/
+
+The online demo showcases:
+
+- High-performance barrage rendering
+- Dynamic configuration updates
+- Native Emoji support
+- Sprite atlas animation rendering
+- Interactive barrage events
+- Real-time performance testing
+
+> Powered by Flutter Web + Flame Engine.
 
 ---
 
