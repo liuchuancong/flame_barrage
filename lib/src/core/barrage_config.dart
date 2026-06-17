@@ -7,6 +7,7 @@ class BarrageConfig {
   const BarrageConfig({
     this.fontSize = 18,
     this.fontWeight = FontWeight.w500,
+    this.fontFamily,
     this.textColor = Colors.white,
     this.strokeColor = Colors.black,
     this.opacity = 1.0,
@@ -105,9 +106,13 @@ class BarrageConfig {
   /// Computes the fixed duration length metric in milliseconds.
   int get fixedDurationMs => fixedDuration.inMilliseconds;
 
+  /// fontFamily
+  final String? fontFamily;
+
   BarrageConfig copyWith({
     double? fontSize,
     FontWeight? fontWeight,
+    String? fontFamily,
     Color? textColor,
     Color? strokeColor,
     double? opacity,
@@ -137,6 +142,7 @@ class BarrageConfig {
     return BarrageConfig(
       fontSize: fontSize ?? this.fontSize,
       fontWeight: fontWeight ?? this.fontWeight,
+      fontFamily: fontFamily ?? this.fontFamily,
       textColor: textColor ?? this.textColor,
       strokeColor: strokeColor ?? this.strokeColor,
       opacity: opacity ?? this.opacity,
@@ -175,6 +181,7 @@ class BarrageConfig {
         other.strokeWidth == strokeWidth &&
         other.area == area &&
         other.topAreaDistance == topAreaDistance &&
+        other.fontFamily == fontFamily &&
         other.bottomAreaDistance == bottomAreaDistance &&
         other.safeArea == safeArea &&
         other.fixedDuration == fixedDuration &&
@@ -207,6 +214,7 @@ class BarrageConfig {
       safeArea,
       fixedDuration,
       fps,
+      fontFamily,
       trackHeight,
       emojiSize,
       maxVisibleCount,

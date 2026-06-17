@@ -1,4 +1,5 @@
 import 'main_menu_screen.dart';
+import 'miti_screen_barrage.dart';
 import 'asset_loading_screen.dart';
 import 'live_room_demo_screen.dart';
 import 'memory_profile_screen.dart';
@@ -10,6 +11,7 @@ import 'sprite_sheet_demo_screen.dart';
 import 'custom_effect_demo_screen.dart';
 import 'combo_animation_demo_screen.dart';
 import 'barrage_config_panel_screen.dart';
+import 'barrage_item_style_demo_screen.dart';
 import 'package:flame_barrage/flame_barrage.dart';
 
 class BarrageRouter {
@@ -33,6 +35,8 @@ class BarrageRouter {
           globalConfig = newConfig;
         },
       ),
+      '/multi_screen_barrage': (context) => const MultiScreenBarrageDemoScreen(),
+      '/item_style_demo': (context) => const BarrageItemStyleDemoScreen(),
     };
   }
 }

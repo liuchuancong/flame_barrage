@@ -4,9 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
-## [0.0.1] - 2026-06-16
+## 0.0.3
 
-### Added
+- New demo page for multiple screens sharing single BarrageController, support mutual exclusive switch between full screen and small window
+- New BarrageItem independent style test demo to verify per-danmaku custom style override
+- Add `fontFamily` property to BarrageConfig, BarrageEngine, MixedLayout and BarrageItem, support global and single danmaku custom font configuration
+- Complete pause & resume freeze mechanism for barrage engine
+
+## 0.0.2
+
+- Added GitHub Pages online demo.
+- Added English / Chinese README navigation.
+- Improved documentation.
+- Updated project branding and logo.
+
+## 0.0.1
 
 * Initial public release.
 * High-performance barrage rendering engine powered by Flame.

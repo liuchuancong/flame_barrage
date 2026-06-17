@@ -2,19 +2,10 @@ import 'dart:ui';
 import 'dart:collection';
 import 'package:flame/game.dart';
 import 'package:flame/events.dart';
-import '../atlas/emoji_atlas.dart';
-import '../pool/barrage_pool.dart';
-import '../layout/rich_parser.dart';
-import '../cache/picture_cache.dart';
-import '../core/barrage_config.dart';
-import '../layout/mixed_layout.dart';
-import '../scheduler/track_manager.dart';
-import '../scheduler/track_allocator.dart';
-import '../model/barrage/barrage_item.dart';
-import '../model/barrage/barrage_type.dart';
-import '../model/barrage/barrage_entry.dart';
-import '../render/barrage/mixed_renderer.dart';
-import 'package:flutter/material.dart' show Colors, BuildContext, MediaQuery;
+import 'package:flutter/material.dart';
+import 'package:flame_barrage/flame_barrage.dart';
+import 'package:flame_barrage/src/core/engine_clock.dart';
+import 'package:flame_barrage/src/model/barrage/engine_state.dart';
 
 class BarrageEngine extends FlameGame with TapCallbacks {
   BarrageEngine({required BarrageConfig config, required this.emojiAtlas})
@@ -40,6 +31,9 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   final BarragePool _pool;
 
   final Queue<BarrageItem> _waiting = Queue<BarrageItem>();
+  // ==== 新增：暂停缓存队列 ====
+  final Queue<BarrageItem> _pausedBuffer = Queue<BarrageItem>();
+
   List<BarrageEntry> _activeEntries = [];
   List<BarrageEntry> _backbufferEntries = [];
 
@@ -49,6 +43,10 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   double _metricTimer = 0.0;
   double _cleanupTimer = 0.0;
   bool _initialized = false;
+
+  EngineState _state = EngineState.running;
+  bool get isPaused => _state == EngineState.paused;
+  final EngineClock clock = EngineClock();
 
   double _calculateAllowedHeight(double rawHeight) {
     final BuildContext? ctx = buildContext;
@@ -79,6 +77,25 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       bottomInset = MediaQuery.paddingOf(ctx).bottom;
     }
     return bottomInset + _config.bottomAreaDistance;
+  }
+
+  void pause() {
+    if (isPaused) return;
+    _state = EngineState.paused;
+    clock.pause();
+  }
+
+  void resume() {
+    if (!isPaused) return;
+    clock.resume();
+    _flushPausedBuffer();
+    _state = EngineState.running;
+  }
+
+  void _flushPausedBuffer() {
+    while (_pausedBuffer.isNotEmpty) {
+      _waiting.add(_pausedBuffer.removeFirst());
+    }
   }
 
   @override
@@ -177,35 +194,42 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   }
 
   void pushMessage(BarrageItem item) {
-    _waiting.add(item);
+    if (isPaused) {
+      _pausedBuffer.add(item);
+    } else {
+      _waiting.add(item);
+    }
   }
 
   @override
   void update(double dt) {
     super.update(dt);
-    if (!_initialized) return;
+    if (!_initialized || isPaused) return;
+
+    clock.tick(dt);
+    final int nowMs = clock.now();
 
     _emitTimer += dt;
     if (_emitTimer >= _config.emitInterval) {
       _emitTimer = 0.0;
-      _dispatchWaiting();
+      _dispatchWaiting(nowMs);
     }
 
     final int len = _activeEntries.length;
-    final double fixedDurationSec = _config.fixedDurationMs / 1000.0;
 
     for (int i = 0; i < len; i++) {
       final entry = _activeEntries[i];
       if (!entry.active) continue;
 
       if (entry.item.type == BarrageType.scroll) {
-        entry.x -= _config.baseSpeed * dt;
+        final deltaMs = nowMs - entry.lastUpdateTime;
+        entry.x -= _config.baseSpeed * deltaMs / 1000.0;
+        entry.lastUpdateTime = nowMs;
         if (entry.x + entry.width < 0) {
           entry.active = false;
         }
       } else {
-        entry.lifeTime += dt;
-        if (entry.lifeTime >= fixedDurationSec) {
+        if (nowMs >= entry.expireTime) {
           entry.active = false;
         }
       }
@@ -236,57 +260,61 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     _metricTimer += dt;
     if (_metricTimer >= 0.032) {
       _metricTimer = 0.0;
-      _updateTrackMetrics();
+      _updateTrackMetrics(nowMs);
     }
   }
 
-  void _dispatchWaiting() {
+  void _dispatchWaiting(int now) {
     if (_waiting.isEmpty) return;
-
     if (_currentAliveCount >= _config.maxVisibleCount) return;
-
-    _trackManager.initialize(_config, _calculateAllowedHeight(size.y));
-    if (_trackManager.tracks.isEmpty) return;
-
     final item = _waiting.first;
+    final resolvedConfig = _config.copyWith(
+      textColor: item.textColor,
+      fontSize: item.fontSize,
+      fontWeight: item.fontWeight,
+      fontFamily: item.fontFamily,
+      showStroke: item.showStroke,
+      strokeColor: item.strokeColor,
+      strokeWidth: item.strokeWidth,
+      emojiSize: item.emojiSize,
+      baseSpeed: item.baseSpeed,
+      overlapSafeGap: item.overlapSafeGap,
+    );
+    _trackManager.initialize(resolvedConfig, _calculateAllowedHeight(size.y));
+    if (_trackManager.tracks.isEmpty) return;
     final fragments = _parser.parse(item.content);
-    final layoutResult = _layout.layout(fragments, item: item, config: _config);
-
-    final mockEntry = _pool.obtain(item: item, creationTime: DateTime.now().millisecondsSinceEpoch)
+    final layoutResult = _layout.layout(fragments, item: item, config: resolvedConfig);
+    final mockEntry = _pool.obtain(item: item, creationTime: now)
       ..width = layoutResult.width
-      ..height = layoutResult.height;
-
-    mockEntry.speed = item.type == BarrageType.scroll ? _config.baseSpeed : 0.0;
-
+      ..height = layoutResult.height
+      ..lastUpdateTime = now
+      ..spawnTime = now
+      ..expireTime = now + _config.fixedDurationMs;
+    mockEntry.speed = item.type == BarrageType.scroll ? resolvedConfig.baseSpeed : 0.0;
     final trackIndex = _trackAllocator.allocate(
       tracks: _trackManager.tracks,
       current: mockEntry,
       screenWidth: size.x,
-      config: _config,
+      config: resolvedConfig,
     );
-
     if (trackIndex == -1) {
       _pool.recycle(mockEntry);
       return;
     }
-
     _waiting.removeFirst();
-
     final track = _trackManager.tracks[trackIndex];
-    final now = DateTime.now().millisecondsSinceEpoch;
     track.lastLaunchTime = now;
-
     final cacheKey = buildCacheKey(item);
     Picture? picture = _pictureCache.get(cacheKey);
     if (picture == null) {
       picture = _renderer.buildPicture(layoutResult);
       _pictureCache.put(cacheKey, picture);
     }
-
     double startX = size.x;
     double startY =
-        _getTopOffset() + (trackIndex * _config.trackHeight) + (_config.trackHeight - layoutResult.height) / 2;
-
+        _getTopOffset() +
+        (trackIndex * resolvedConfig.trackHeight) +
+        (resolvedConfig.trackHeight - layoutResult.height) / 2;
     if (item.type != BarrageType.scroll) {
       track.locked = true;
       startX = (size.x - layoutResult.width) / 2;
@@ -294,27 +322,23 @@ class BarrageEngine extends FlameGame with TapCallbacks {
         startY =
             size.y -
             _getBottomOffset() -
-            ((trackIndex + 1) * _config.trackHeight) +
-            (_config.trackHeight - layoutResult.height) / 2;
+            ((trackIndex + 1) * resolvedConfig.trackHeight) +
+            (resolvedConfig.trackHeight - layoutResult.height) / 2;
       }
     }
-
     mockEntry.track = trackIndex;
     mockEntry.x = startX;
     mockEntry.y = startY;
     mockEntry.picture = picture;
     mockEntry.active = true;
-
     track.lastRight = startX + layoutResult.width;
     track.lastEntry = mockEntry;
     track.activeCount++;
-
     _activeEntries.add(mockEntry);
     _currentAliveCount++;
   }
 
-  void _updateTrackMetrics() {
-    final now = DateTime.now().millisecondsSinceEpoch;
+  void _updateTrackMetrics(int now) {
     final entryLen = _activeEntries.length;
 
     for (final track in _trackManager.tracks) {
@@ -392,6 +416,8 @@ class BarrageEngine extends FlameGame with TapCallbacks {
 
   void clear() {
     _waiting.clear();
+    // 清空暂停缓存
+    _pausedBuffer.clear();
     _pictureCache.clear();
     for (var e in _activeEntries) {
       _pool.recycle(e);
@@ -412,25 +438,17 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     return [
       item.content,
       item.type.name,
-      _config.fontSize,
-      _config.fontWeight.toString(),
-      _config.textColor.toARGB32(),
-      config.emojiSize,
+      item.fontSize ?? _config.fontSize,
+      (item.fontWeight ?? _config.fontWeight).toString(),
+      (item.textColor ?? _config.textColor).toARGB32(),
+      item.emojiSize ?? _config.emojiSize,
+      item.fontFamily ?? '',
     ].join('');
   }
 
   @override
   void onRemove() {
-    _waiting.clear();
-    _pictureCache.clear();
-    _trackManager.tracks.clear();
-    for (var e in _activeEntries) {
-      _pool.recycle(e);
-    }
-    _activeEntries.clear();
-    _backbufferEntries.clear();
-    _pool.clear();
-    _currentAliveCount = 0;
+    clear();
     super.onRemove();
   }
 
