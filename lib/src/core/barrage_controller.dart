@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class BarrageController {
   dynamic _engine;
   void Function(dynamic)? _onAddDanmaku;
@@ -37,7 +35,6 @@ class BarrageController {
   void send(dynamic item) {
     if (!running) return;
     _totalEmittedCount++;
-    debugPrint('Send barrage item: ${item.content}');
     _onAddDanmaku?.call(item);
   }
 
