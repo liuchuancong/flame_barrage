@@ -6,12 +6,18 @@ import 'package:flutter/material.dart';
 import '../core/barrage_controller.dart';
 
 class FlameBarrageWidget extends StatefulWidget {
-  const FlameBarrageWidget({super.key, required this.config, required this.emojiAtlas, required this.controller});
+  const FlameBarrageWidget({
+    super.key,
+    required this.config,
+    required this.emojiAtlas,
+    required this.controller,
+    this.enablePointerEvents = false,
+  });
 
   final BarrageConfig config;
   final EmojiAtlas emojiAtlas;
   final BarrageController controller;
-
+  final bool enablePointerEvents;
   @override
   State<FlameBarrageWidget> createState() => _FlameBarrageWidgetState();
 }
@@ -80,6 +86,15 @@ class _FlameBarrageWidgetState extends State<FlameBarrageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return GameWidget(game: _engine);
+    Widget child = ClipRect(
+      clipBehavior: Clip.hardEdge,
+      child: GameWidget(game: _engine),
+    );
+
+    if (!widget.enablePointerEvents) {
+      child = IgnorePointer(child: child);
+    }
+
+    return child;
   }
 }

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
+## 0.0.4
+
+- Added optional pointer event handling for `FlameBarrageWidget`.
+- Added `enablePointerEvents` property to control whether the barrage widget responds to mouse and touch events.
+- Improved barrage rendering isolation and prevented unnecessary pointer event processing when interaction is disabled.
+- Fixed potential rendering artifacts caused by pointer events.
+
 ## 0.0.3
 
 - New demo page for multiple screens sharing single BarrageController, support mutual exclusive switch between full screen and small window
