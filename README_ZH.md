@@ -35,6 +35,7 @@ https://liuchuancong.github.io/flame_barrage/
 - 📈 实时性能压测
 
 > 基于 Flutter Web 与 Flame Engine 构建。
+
 ---
 
 ## 🚀 项目简介
@@ -172,7 +173,7 @@ FlameBarrage Engine 是一个基于 Flame 图形框架打造的高性能、硬�
 ```yaml
 dependencies:
   flame: ^1.37.0
-  flame_barrage: ^0.0.3
+  flame_barrage: ^0.0.4
 ```
 
 ---
