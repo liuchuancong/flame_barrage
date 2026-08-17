@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
+## 0.0.5
+
+- Added per‑track differentiated scroll speed for scrolling barrages.
+- Speed is calculated based on track position and current track barrage count, applied on barrage creation.
+- Added `useUniformSpeed` flag to `BarrageConfig`, toggle uniform speed mode, default `true` for backward compatibility.
+- Added `dynamicSpeedWhileFlying` flag to `BarrageConfig`. When enabled, already flying scroll barrages adjust speed in real‑time according to track status; may cause barrage overlap, default `false`.
+- Fixed scroll barrage movement using hard‑coded baseSpeed value, now uses entry.speed.
+- Fixed track speed factor not working when track already has barrages.
+- Retained original single‑track anti‑overtake logic.
+
+> Note: Differentiated speed only affects newly spawned barrages by default. Already flying barrages retain their initial speed to prevent overlap. Enable `dynamicSpeedWhileFlying` to turn on real‑time speed adjustment.
+
+
+
+
 ## 0.0.4
 
 - Added optional pointer event handling for `FlameBarrageWidget`.

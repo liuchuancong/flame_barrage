@@ -30,6 +30,8 @@ class BarrageConfig {
     this.pictureCacheMaxSize = 200,
     this.textCacheMaxSize = 1000,
     this.effectInterceptors = const [],
+    this.useUniformSpeed = true,
+    this.dynamicSpeedWhileFlying = false,
   });
 
   /// The baseline font size for typography fragments in pixels.
@@ -103,6 +105,15 @@ class BarrageConfig {
   /// The list of plugin interceptor nodes hooked onto the pre-layout pipeline workspace.
   final List<BarrageEffectInterceptor> effectInterceptors;
 
+  /// Use uniform speed for all tracks.
+  /// true: all tracks use baseSpeed, disable track‑differentiated speed.
+  /// false: enable differentiated speed calculated by track position and crowd level.
+  final bool useUniformSpeed;
+
+  /// Whether to dynamically adjust speed for already flying scroll barrages.
+  /// true: real‑time speed change, may cause barrage overlap.
+  final bool dynamicSpeedWhileFlying;
+
   /// Computes the fixed duration length metric in milliseconds.
   int get fixedDurationMs => fixedDuration.inMilliseconds;
 
@@ -138,6 +149,8 @@ class BarrageConfig {
     int? pictureCacheMaxSize,
     int? textCacheMaxSize,
     List<BarrageEffectInterceptor>? effectInterceptors,
+    bool? useUniformSpeed,
+    bool? dynamicSpeedWhileFlying,
   }) {
     return BarrageConfig(
       fontSize: fontSize ?? this.fontSize,
@@ -165,6 +178,8 @@ class BarrageConfig {
       pictureCacheMaxSize: pictureCacheMaxSize ?? this.pictureCacheMaxSize,
       textCacheMaxSize: textCacheMaxSize ?? this.textCacheMaxSize,
       effectInterceptors: effectInterceptors ?? this.effectInterceptors,
+      useUniformSpeed: useUniformSpeed ?? this.useUniformSpeed,
+      dynamicSpeedWhileFlying: dynamicSpeedWhileFlying ?? this.dynamicSpeedWhileFlying,
     );
   }
 
@@ -195,7 +210,9 @@ class BarrageConfig {
         other.noEmojiMode == noEmojiMode &&
         other.barragePoolMaxSize == barragePoolMaxSize &&
         other.pictureCacheMaxSize == pictureCacheMaxSize &&
-        other.textCacheMaxSize == textCacheMaxSize;
+        other.textCacheMaxSize == textCacheMaxSize &&
+        other.useUniformSpeed == useUniformSpeed &&
+        other.dynamicSpeedWhileFlying == dynamicSpeedWhileFlying;
   }
 
   @override
@@ -224,6 +241,8 @@ class BarrageConfig {
       barragePoolMaxSize,
       pictureCacheMaxSize,
       textCacheMaxSize,
+      useUniformSpeed,
+      dynamicSpeedWhileFlying,
     ]);
   }
 }

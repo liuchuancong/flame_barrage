@@ -7,12 +7,12 @@ class TrackManager {
 
   double _lastHeight = -1.0;
   int _lastMaxTracks = -1;
-
+  int safeMarginHeight = 12;
   void initialize(BarrageConfig config, double screenHeight) {
     if (screenHeight <= 0) return;
 
-    final double safeTrackHeight = config.trackHeight < (config.fontSize + 10)
-        ? (config.fontSize + 10)
+    final double safeTrackHeight = config.trackHeight < (config.fontSize + safeMarginHeight)
+        ? (config.fontSize + safeMarginHeight)
         : config.trackHeight;
 
     final double usableHeight = screenHeight * config.area;

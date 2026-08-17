@@ -173,7 +173,7 @@ FlameBarrage Engine 是一个基于 Flame 图形框架打造的高性能、硬�
 ```yaml
 dependencies:
   flame: ^1.37.0
-  flame_barrage: ^0.0.4
+  flame_barrage: ^0.0.5
 ```
 
 ---

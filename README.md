@@ -173,7 +173,7 @@ Add the following dependencies to your `pubspec.yaml`:
 ```yaml
 dependencies:
   flame: ^1.37.0
-  flame_barrage: ^0.0.4
+  flame_barrage: ^0.0.5
 ```
 
 ---

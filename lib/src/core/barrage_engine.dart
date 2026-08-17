@@ -28,6 +28,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   final PictureCache _pictureCache;
   final TrackManager _trackManager = TrackManager();
   final TrackAllocator _trackAllocator = const TrackAllocator();
+  final SpeedStrategy _speedStrategy = const SpeedStrategy();
   final BarragePool _pool;
 
   final Queue<BarrageItem> _waiting = Queue<BarrageItem>();
@@ -223,7 +224,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
 
       if (entry.item.type == BarrageType.scroll) {
         final deltaMs = nowMs - entry.lastUpdateTime;
-        entry.x -= _config.baseSpeed * deltaMs / 1000.0;
+        entry.x -= entry.speed * deltaMs / 1000.0;
         entry.lastUpdateTime = nowMs;
         if (entry.x + entry.width < 0) {
           entry.active = false;
@@ -279,6 +280,8 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       emojiSize: item.emojiSize,
       baseSpeed: item.baseSpeed,
       overlapSafeGap: item.overlapSafeGap,
+      useUniformSpeed: _config.useUniformSpeed,
+      dynamicSpeedWhileFlying: _config.dynamicSpeedWhileFlying,
     );
     _trackManager.initialize(resolvedConfig, _calculateAllowedHeight(size.y));
     if (_trackManager.tracks.isEmpty) return;
@@ -290,7 +293,6 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       ..lastUpdateTime = now
       ..spawnTime = now
       ..expireTime = now + _config.fixedDurationMs;
-    mockEntry.speed = item.type == BarrageType.scroll ? resolvedConfig.baseSpeed : 0.0;
     final trackIndex = _trackAllocator.allocate(
       tracks: _trackManager.tracks,
       current: mockEntry,
@@ -303,6 +305,18 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     }
     _waiting.removeFirst();
     final track = _trackManager.tracks[trackIndex];
+    if (item.type == BarrageType.scroll) {
+      mockEntry.speed = _speedStrategy.calculate(
+        mockEntry,
+        size.x,
+        resolvedConfig,
+        targetTrack: track,
+        totalTrackCount: _trackManager.tracks.length,
+      );
+    } else {
+      mockEntry.speed = 0.0;
+    }
+
     track.lastLaunchTime = now;
     final cacheKey = buildCacheKey(item);
     Picture? picture = _pictureCache.get(cacheKey);
@@ -372,6 +386,18 @@ class BarrageEngine extends FlameGame with TapCallbacks {
           track.locked = false;
           track.lastRight = 0.0;
           track.lastEntry = null;
+        }
+      }
+    }
+    if (!config.useUniformSpeed && config.dynamicSpeedWhileFlying) {
+      for (final track in _trackManager.tracks) {
+        double dynamicFactor =
+            _speedStrategy.positionFactor(track.index, _trackManager.tracks.length) *
+            _speedStrategy.crowdPenalty(track.activeCount);
+        for (final entry in _activeEntries) {
+          if (entry.active && entry.track == track.index && entry.item.type == BarrageType.scroll) {
+            entry.speed = config.baseSpeed * dynamicFactor;
+          }
         }
       }
     }
