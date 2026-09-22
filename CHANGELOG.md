@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
+## 0.0.6
+- Cleaned up formatting and removed unnecessary whitespace in object_pool.dart, picture_pool.dart, emoji_protocol.dart, message_protocol.dart, barrage_renderer.dart, emoji_renderer.dart, mixed_renderer.dart, base_renderer.dart, overlap_detector.dart, speed_strategy.dart, track_allocator.dart, track_manager.dart, barrage_logger.dart, color_util.dart, fps_monitor.dart, measure.dart, barrage_overlay.dart, and flame_barrage_widget.dart.
+- Updated the version in pubspec.yaml from 0.0.5 to 0.0.6.
+- Enhanced the performance of the speed calculation logic in speed_strategy.dart.
+- Improved the track allocation logic in track_allocator.dart to ensure better performance under load.
+- Added proper disposal of resources in flame_barrage_widget.dart to prevent memory leaks.
+
 ## 0.0.5
 
 - Added per‑track differentiated scroll speed for scrolling barrages.
