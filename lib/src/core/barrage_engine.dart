@@ -18,7 +18,7 @@ class _PendingBarrage {
 class BarrageEngine extends FlameGame with TapCallbacks {
   BarrageEngine({required BarrageConfig config, required this.emojiAtlas})
     : _config = config,
-      _pictureCache = PictureCache(maxSize: config.pictureCacheMaxSize),
+      _renderCache = RenderCache(maxSize: config.pictureCacheMaxSize, maxBytes: config.rasterCacheMaxBytes),
       _pool = BarragePool(maxSize: config.barragePoolMaxSize) {
     _parser = RichParser(atlas: emojiAtlas, maxCacheSize: config.textCacheMaxSize);
     _layout = MixedLayout(atlas: emojiAtlas, maxTextCacheSize: config.textCacheMaxSize);
@@ -39,8 +39,19 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   late final MixedLayout _layout;
   late final MixedRenderer _renderer;
 
-  final PictureCache _pictureCache;
+  final RenderCache _renderCache;
   final TrackManager _trackManager = TrackManager();
+
+  /// Reused for every blit so the steady-state render loop allocates nothing
+  /// but the destination offset.
+  final Paint _imagePaint = Paint()
+    ..isAntiAlias = false
+    ..filterQuality = FilterQuality.low;
+
+  /// Device pixels per logical pixel the cached bitmaps are baked at, so text
+  /// stays as crisp as the vector path on high density panels.
+  double _rasterScale = 1.0;
+
   final TrackAllocator _trackAllocator = const TrackAllocator();
   final SpeedStrategy _speedStrategy = const SpeedStrategy();
   final BarragePool _pool;
@@ -292,7 +303,11 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     _config = newConfig;
     _parser.updateMaxCacheSize(newConfig.textCacheMaxSize);
     _layout.updateMaxTextCacheSize(newConfig.textCacheMaxSize);
-    _pictureCache.updateMaxSize(newConfig.pictureCacheMaxSize);
+    _renderCache.updateLimits(
+      maxSize: newConfig.pictureCacheMaxSize,
+      maxBytes: newConfig.rasterCacheMaxBytes,
+    );
+    _syncRasterScale();
     _pool.updateMaxSize(newConfig.barragePoolMaxSize);
     if (_initialized) {
       _trackManager.initialize(_config, _calculateAllowedHeight(size.y));
@@ -307,6 +322,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     await super.onLoad();
     _trackManager.initialize(_config, _calculateAllowedHeight(size.y));
     _initialized = true;
+    _syncRasterScale();
     _resumeLoopIfNeeded();
   }
 
@@ -315,7 +331,30 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     super.onGameResize(size);
     _trackManager.initialize(_config, _calculateAllowedHeight(size.y));
     _initialized = true;
+    _syncRasterScale();
     _resumeLoopIfNeeded();
+  }
+
+  /// Keeps [_rasterScale] in sync with the display density so baked bitmaps are
+  /// rasterized at device resolution instead of being upscaled by the GPU.
+  void _syncRasterScale() {
+    double scale = 1.0;
+    final BuildContext? ctx = buildContext;
+    if (ctx != null) {
+      try {
+        final double? ratio = MediaQuery.maybeDevicePixelRatioOf(ctx);
+        if (ratio != null && ratio > 0) {
+          scale = ratio.clamp(1.0, 4.0).toDouble();
+        }
+      } catch (_) {
+        scale = 1.0;
+      }
+    }
+    if ((scale - _rasterScale).abs() < 0.01) return;
+    // Bitmaps baked for a different density would be resampled at the wrong
+    // size; messages still on screen keep theirs until they are recycled.
+    if (_initialized) _renderCache.clear();
+    _rasterScale = scale;
   }
 
   void pushMessage(BarrageItem item) {
@@ -391,7 +430,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
         if (entry.active) {
           _backbufferEntries.add(entry);
         } else {
-          _pool.recycle(entry);
+          _releaseEntry(entry);
           _currentAliveCount--;
         }
       }
@@ -533,11 +572,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     }
     track.lastLaunchTime = now;
     final cacheKey = buildCacheKey(item);
-    Picture? picture = _pictureCache.get(cacheKey);
-    if (picture == null) {
-      picture = _renderer.buildPicture(layoutResult);
-      _pictureCache.put(cacheKey, picture);
-    }
+    CachedRender render = _renderCache.acquire(cacheKey) ?? _storeRender(cacheKey, item, layoutResult);
     double startX = size.x;
     double startY =
         _getTopOffset() +
@@ -558,13 +593,86 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     mockEntry.track = trackIndex;
     mockEntry.x = startX;
     mockEntry.y = startY;
-    mockEntry.picture = picture;
+    mockEntry.render = render;
+    mockEntry.picture = render.picture;
     mockEntry.active = true;
     track.lastRight = startX + layoutResult.width;
     track.lastEntry = mockEntry;
     track.activeCount++;
     _activeEntries.add(mockEntry);
     _currentAliveCount++;
+  }
+
+  /// Transparent margin baked around every message. Strokes, glows and shadows
+  /// reach past the text bounds and must not be clipped by the bitmap edge;
+  /// this mirrors the allowance MixedRenderer keeps in its recording cull rect.
+  static const double _rasterPadding = 8.0;
+
+  /// Several TV GPUs refuse textures beyond this edge length. Longer messages
+  /// keep using the vector recording instead of vanishing.
+  static const double _maxRasterDimension = 4096.0;
+
+  /// Builds and caches the render for [layoutResult]. The returned reference is
+  /// owned by the caller and must be handed to [_releaseEntry] with its barrage.
+  CachedRender _storeRender(String cacheKey, BarrageItem item, LayoutResult layoutResult) {
+    final render = CachedRender(picture: _renderer.buildPicture(layoutResult));
+    _bakeRender(render, layoutResult.width, layoutResult.height);
+    return _renderCache.put(cacheKey, render);
+  }
+
+  /// Rasterizes [render] once so display frames only have to blit it.
+  ///
+  /// The picture is recorded into a device-pixel sized bitmap here, on the UI
+  /// thread, but `toImageSync` only creates a handle: the actual rasterization
+  /// happens on the raster thread, off the frame's critical path. Every message
+  /// that appears more than once — a repeated "666", a welcome template — then
+  /// costs one textured quad per frame instead of re-running its text, stroke,
+  /// shadow and emoji operations.
+  void _bakeRender(CachedRender render, double width, double height) {
+    if (!_config.rasterizeItems || !_renderCache.rasterizationSupported) return;
+    if (width <= 0 || height <= 0) return;
+
+    final double scale = _rasterScale;
+    final double paddedWidth = (width + _rasterPadding * 2) * scale;
+    final double paddedHeight = (height + _rasterPadding * 2) * scale;
+    if (paddedWidth > _maxRasterDimension || paddedHeight > _maxRasterDimension) return;
+
+    try {
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, paddedWidth, paddedHeight));
+      canvas.scale(scale);
+      canvas.translate(_rasterPadding, _rasterPadding);
+      canvas.drawPicture(render.picture);
+      final source = recorder.endRecording();
+      render.image = source.toImageSync(paddedWidth.ceil(), paddedHeight.ceil());
+      render.rasterSource = source;
+      render.padding = _rasterPadding;
+      render.rasterWidth = width + _rasterPadding * 2;
+      render.rasterHeight = height + _rasterPadding * 2;
+      render.rasterSrc = Rect.fromLTWH(0, 0, paddedWidth, paddedHeight);
+      render.oneToOne = scale == 1.0;
+    } catch (error) {
+      // Renderers without picture rasterization support (the HTML renderer, a
+      // few embedders) throw here. Stop attempting it entirely rather than
+      // paying for a failed try on every dispatched message.
+      _renderCache.rasterizationSupported = false;
+      render.image?.dispose();
+      render.image = null;
+      render.rasterSource?.dispose();
+      render.rasterSource = null;
+      BarrageLogger.w('Performance', '弹幕位图烘焙不可用，已回退到矢量绘制: $error');
+    }
+  }
+
+  /// Drops the entry's claim on its bitmap, then returns it to the pool. Safe to
+  /// call twice: the second call finds nothing left to release.
+  void _releaseEntry(BarrageEntry entry) {
+    final render = entry.render;
+    if (render != null) {
+      entry.render = null;
+      _renderCache.release(render);
+    }
+    _pool.recycle(entry);
   }
 
   // Reused across calls so the steady-state path (track count unchanged)
@@ -637,7 +745,7 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   }
 
   void recycleComponent(BarrageEntry entry) {
-    _pool.recycle(entry);
+    _releaseEntry(entry);
   }
 
   @override
@@ -645,15 +753,44 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     super.render(canvas);
     if (!_initialized) return;
     final int len = _activeEntries.length;
-    // Text/emoji/sprite alpha is baked into each cached Picture by
-    // MixedLayout. The previous implementation created one offscreen
-    // saveLayer per visible item, per display frame: up to 48 * 120 layers/s.
+    final Paint paint = _imagePaint;
+    // Text/emoji/sprite alpha is baked into each cached artifact by
+    // MixedLayout, and with rasterizeItems the whole message is a bitmap, so a
+    // frame only blits it. Replaying the vector recording instead re-runs every
+    // text, stroke, shadow and emoji op per display frame — stroked glyphs are
+    // re-tessellated on each of those replays, which is what makes a full
+    // screen of danmaku miss a 144 Hz deadline on TV-class hardware.
     for (int i = 0; i < len; i++) {
       final entry = _activeEntries[i];
-      if (!entry.active || entry.picture == null) continue;
+      if (!entry.active) continue;
+
+      final render = entry.render;
+      final image = render?.image;
+      if (image != null) {
+        final current = render!;
+        if (current.oneToOne) {
+          canvas.drawImage(image, Offset(entry.x - current.padding, entry.y - current.padding), paint);
+        } else {
+          canvas.drawImageRect(
+            image,
+            current.rasterSrc,
+            Rect.fromLTWH(
+              entry.x - current.padding,
+              entry.y - current.padding,
+              current.rasterWidth,
+              current.rasterHeight,
+            ),
+            paint,
+          );
+        }
+        continue;
+      }
+
+      final picture = entry.picture;
+      if (picture == null) continue;
       canvas.save();
       canvas.translate(entry.x, entry.y);
-      canvas.drawPicture(entry.picture!);
+      canvas.drawPicture(picture);
       canvas.restore();
     }
   }
@@ -663,12 +800,12 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     _waiting.clear();
     // 清空暂停缓存
     _pausedBuffer.clear();
-    _pictureCache.clear();
     _parser.clearCache();
     _layout.clearCache();
     for (var e in _activeEntries) {
-      _pool.recycle(e);
+      _releaseEntry(e);
     }
+    _renderCache.clear();
     _activeEntries.clear();
     _backbufferEntries.clear();
     _pool.clear();
@@ -753,7 +890,17 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     }
   }
 
-  int get activeCacheSize => _pictureCache.size;
+  int get activeCacheSize => _renderCache.size;
+
+  /// Number of messages currently on screen, which is what a frame pays for.
+  int get activeCount => _currentAliveCount;
+
+  /// Approximate GPU memory held by the cached message bitmaps, in bytes.
+  int get rasterCacheBytes => _renderCache.byteSize;
+
+  /// Whether messages are currently rasterized instead of replayed as vectors.
+  bool get rasterizationActive => _config.rasterizeItems && _renderCache.rasterizationSupported;
+
   int get activePoolSize => _pool.currentSize;
   int get pendingMessageCount => _waiting.length + _pausedBuffer.length;
   int get parserCacheSize => _parser.cacheCount;

@@ -36,6 +36,8 @@ class BarrageConfig {
     this.noEmojiMode = false,
     this.barragePoolMaxSize = 150,
     this.pictureCacheMaxSize = 200,
+    this.rasterizeItems = true,
+    this.rasterCacheMaxBytes = 24 * 1024 * 1024,
     this.textCacheMaxSize = 1000,
     this.effectInterceptors = const [],
   });
@@ -124,6 +126,22 @@ class BarrageConfig {
   /// The maximum element size allocation allowed within the hardware LRU Picture bitmap cache map.
   final int pictureCacheMaxSize;
 
+  /// Rasterizes each message into a GPU-resident bitmap once, so a display frame
+  /// blits one textured quad per visible barrage instead of replaying its text,
+  /// stroke, shadow and emoji operations. This is the single most effective
+  /// switch on TV and other low-end GPUs, where re-rasterizing stroked CJK
+  /// glyphs every frame is what makes a 144 Hz target miss its deadline.
+  ///
+  /// Set to false only when vector output is required (for example capturing a
+  /// frame at a different scale than the display) or when GPU memory is scarce.
+  final bool rasterizeItems;
+
+  /// Upper bound of GPU memory used by the rasterized message bitmaps. Once the
+  /// budget or [pictureCacheMaxSize] is exceeded, the least recently used
+  /// message releases its bitmap; bitmaps still on screen are kept and only
+  /// dropped after they leave it.
+  final int rasterCacheMaxBytes;
+
   /// The maximum element size threshold for caching compiled C++ Paragraph layout shapes.
   final int textCacheMaxSize;
 
@@ -171,6 +189,8 @@ class BarrageConfig {
     bool? noEmojiMode,
     int? barragePoolMaxSize,
     int? pictureCacheMaxSize,
+    bool? rasterizeItems,
+    int? rasterCacheMaxBytes,
     int? textCacheMaxSize,
     List<BarrageEffectInterceptor>? effectInterceptors,
   }) {
@@ -206,6 +226,8 @@ class BarrageConfig {
       noEmojiMode: noEmojiMode ?? this.noEmojiMode,
       barragePoolMaxSize: barragePoolMaxSize ?? this.barragePoolMaxSize,
       pictureCacheMaxSize: pictureCacheMaxSize ?? this.pictureCacheMaxSize,
+      rasterizeItems: rasterizeItems ?? this.rasterizeItems,
+      rasterCacheMaxBytes: rasterCacheMaxBytes ?? this.rasterCacheMaxBytes,
       textCacheMaxSize: textCacheMaxSize ?? this.textCacheMaxSize,
       effectInterceptors: effectInterceptors ?? this.effectInterceptors,
     );
@@ -246,6 +268,8 @@ class BarrageConfig {
         other.noEmojiMode == noEmojiMode &&
         other.barragePoolMaxSize == barragePoolMaxSize &&
         other.pictureCacheMaxSize == pictureCacheMaxSize &&
+        other.rasterizeItems == rasterizeItems &&
+        other.rasterCacheMaxBytes == rasterCacheMaxBytes &&
         other.textCacheMaxSize == textCacheMaxSize;
   }
 
@@ -283,6 +307,8 @@ class BarrageConfig {
       noEmojiMode,
       barragePoolMaxSize,
       pictureCacheMaxSize,
+      rasterizeItems,
+      rasterCacheMaxBytes,
       textCacheMaxSize,
     ]);
   }

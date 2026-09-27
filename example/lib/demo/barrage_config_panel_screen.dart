@@ -28,6 +28,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
   double _emitInterval = 0.05;
   int _barragePoolMaxSize = 150;
   int _pictureCacheMaxSize = 200;
+  bool _rasterizeItems = true;
   int _textCacheMaxSize = 1000;
   double _overlapSafeGap = 40.0;
   bool _noEmojiMode = false;
@@ -75,6 +76,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
     _noEmojiMode = config.noEmojiMode;
     _barragePoolMaxSize = config.barragePoolMaxSize;
     _pictureCacheMaxSize = config.pictureCacheMaxSize;
+    _rasterizeItems = config.rasterizeItems;
     _textCacheMaxSize = config.textCacheMaxSize;
   }
 
@@ -104,6 +106,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
       noEmojiMode: _noEmojiMode,
       barragePoolMaxSize: _barragePoolMaxSize,
       pictureCacheMaxSize: _pictureCacheMaxSize,
+      rasterizeItems: _rasterizeItems,
       textCacheMaxSize: _textCacheMaxSize,
     );
   }
@@ -356,6 +359,14 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
 
                 const Divider(height: 32),
                 _buildSectionTitle('📦 零开销对象池与物理二级缓存上限'),
+                _buildSwitchSetting(
+                  '弹幕位图化渲染 (rasterizeItems · 低端设备/TV 强烈建议开启)',
+                  _rasterizeItems,
+                  (v) => setState(() {
+                    _rasterizeItems = v;
+                    _pushLiveUpdate();
+                  }),
+                ),
                 _buildSliderSetting(
                   'BarrageComponent 对象池上限',
                   _barragePoolMaxSize.toDouble(),
@@ -368,7 +379,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  'Picture 位图硬件缓存上限',
+                  '弹幕位图缓存条数上限 (pictureCacheMaxSize)',
                   _pictureCacheMaxSize.toDouble(),
                   50,
                   1500,

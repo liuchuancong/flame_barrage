@@ -103,4 +103,26 @@ class BarrageController {
     }
     return 0;
   }
+
+  /// Messages currently on screen, which is what a frame actually pays for.
+  int get activeItemCount {
+    final currentEngine = _engine;
+    if (currentEngine != null) {
+      try {
+        return currentEngine.activeCount as int;
+      } catch (_) {}
+    }
+    return 0;
+  }
+
+  /// GPU memory held by the rasterized message bitmaps, in bytes.
+  int get rasterCacheBytes {
+    final currentEngine = _engine;
+    if (currentEngine != null) {
+      try {
+        return currentEngine.rasterCacheBytes as int;
+      } catch (_) {}
+    }
+    return 0;
+  }
 }

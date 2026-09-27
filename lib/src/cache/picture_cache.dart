@@ -1,6 +1,12 @@
 import 'dart:ui' as ui;
 import 'dart:collection';
 
+/// Picture-only LRU cache, kept for compatibility.
+///
+/// The engine now uses [RenderCache], which also holds the rasterized bitmap of
+/// each message and keeps every artifact alive while a visible barrage still
+/// draws it. This class disposes an evicted picture immediately, so it is only
+/// safe for callers that know nothing is drawing what they evict.
 class PictureCache {
   PictureCache({required this.maxSize});
 

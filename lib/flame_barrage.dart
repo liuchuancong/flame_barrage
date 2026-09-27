@@ -12,6 +12,7 @@ export 'src/atlas/sprite_sheet.dart';
 // cache
 export 'src/cache/atlas_cache.dart';
 export 'src/cache/picture_cache.dart';
+export 'src/cache/render_cache.dart';
 export 'src/cache/sprite_cache.dart';
 export 'src/cache/text_cache.dart';
 

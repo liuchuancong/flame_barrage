@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'barrage_item.dart';
+import '../../cache/render_cache.dart';
 
 class BarrageEntry {
   BarrageEntry({required this.item, required this.creationTime});
@@ -42,8 +43,13 @@ class BarrageEntry {
   // =========================
   Paragraph? paragraph;
   Paragraph? strokeParagraph;
+
+  /// 本条弹幕实际绘制的矢量录制（引用缓存条目，不要单独 dispose）
   Picture? picture;
   String? pictureCacheKey;
+
+  /// 缓存条目，持有本条的绘制资源引用计数；回收时必须 release
+  CachedRender? render;
 
   double? cachedWidth;
 
@@ -72,6 +78,7 @@ class BarrageEntry {
     strokeParagraph = null;
     picture = null;
     pictureCacheKey = null;
+    render = null;
     cachedWidth = null;
   }
 }

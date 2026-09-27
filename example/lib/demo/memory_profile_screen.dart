@@ -20,6 +20,8 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
   int _totalEmitted = 0;
   int _pictureCacheCount = 0;
   int _poolObjectCount = 0;
+  int _activeItemCount = 0;
+  int _rasterCacheBytes = 0;
 
   @override
   void initState() {
@@ -45,6 +47,8 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
       _totalEmitted = _singletonController.totalEmitted;
       _pictureCacheCount = _singletonController.pictureCacheCount;
       _poolObjectCount = _singletonController.poolObjectCount;
+      _activeItemCount = _singletonController.activeItemCount;
+      _rasterCacheBytes = _singletonController.rasterCacheBytes;
     });
   }
 
@@ -102,9 +106,15 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
                 _buildMetricRow('累计发射总数', '$_totalEmitted 条', Colors.blue),
                 const SizedBox(height: 8),
                 _buildMetricRow(
-                  'Picture 位图硬件缓存 (LRU)',
+                  '弹幕位图硬件缓存 (LRU)',
                   '$_pictureCacheCount / ${currentConfig.pictureCacheMaxSize}',
                   Colors.orange,
+                ),
+                const SizedBox(height: 8),
+                _buildMetricRow(
+                  '位图显存占用 / 同屏弹幕数',
+                  '${(_rasterCacheBytes / 1048576).toStringAsFixed(1)} MB / $_activeItemCount 条',
+                  Colors.purpleAccent,
                 ),
                 const SizedBox(height: 8),
                 _buildMetricRow(

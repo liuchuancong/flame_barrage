@@ -73,6 +73,19 @@ Instead of creating a widget for every barrage item, FlameBarrage decomposes tex
 
 ---
 
+### 🖼️ Rasterized Barrage Bitmaps
+
+Each message is recorded once as a vector display list, then baked into a GPU-resident bitmap at device resolution (`BarrageConfig.rasterizeItems`, on by default). A display frame then draws one textured quad per visible message instead of replaying its text, outline, shadow and emoji operations — and a stroked glyph run is re-tessellated on the raster thread on every one of those replays, which is what makes a full screen of danmaku miss its deadline on TV-class hardware.
+
+**Measured on a 1080p scene with ~74 messages on screen** (Windows / Impeller, per-frame raster time): **p50 1.99 ms → 0.82 ms, p90 2.19 ms → 1.04 ms, VRAM cost 8.3 MB**. A synthetic CPU-raster scene of 100 distinct CJK messages drops from 4.63 ms to 2.41 ms per frame.
+
+- Bitmaps are reference counted, so a cache eviction never disposes something still on screen
+- Bounded by `pictureCacheMaxSize` entries and `rasterCacheMaxBytes` of GPU memory
+- Repeated content ("666", welcome templates) shares a single bitmap across every instance
+- Messages longer than 4096 device pixels, and platforms without picture rasterization, transparently keep the vector path
+
+---
+
 ### 🎨 Dual-Pass Typography Rendering
 
 Text outlines and fill colors are rendered independently to ensure visual consistency and eliminate common font cache issues.
@@ -324,13 +337,32 @@ class CustomFragment extends Fragment {
 
 ---
 
+## 📺 TV & Low-End Device Tuning
+
+Android TV boxes and other weak SoCs usually have a modest GPU, a slow CPU, and a 60 Hz panel. A configuration that is comfortable on a phone can still stutter there, so tune these first:
+
+| Setting | Recommendation | Why |
+| --- | --- | --- |
+| `fps` | Set it to the panel's refresh rate (60 or 120) | The engine can never step more often than the display refreshes. Setting `fps: 144` on a 60 Hz TV changes nothing — if frames still drop, the cost per frame is the problem, not the target rate. |
+| `rasterizeItems` | `true` (default) | Removes per-frame text, stroke and shadow rasterization. |
+| `maxVisibleCount` | 40–80 on a weak GPU | This is the number of bitmap blits per frame. |
+| `showStroke` | Keep `true` if the text sits on bright video; disable if the bake cost itself shows up as a startup spike | The outline is rasterized once per message rather than per frame, so it is no longer a per-frame cost. |
+| `trackHeight` / `area` | A full screen of lanes only helps if the GPU can fill it | Fewer lanes means fewer messages on screen at once. |
+| `pictureCacheMaxSize` / `rasterCacheMaxBytes` | Fit the bitmap budget to the device | Caps the GPU memory the cache may hold (`rasterCacheBytes` reports live usage). |
+| `emitInterval` | `0.1` for a calm stream, `0.02`–`0.05` for a busy one | Paces how many new messages are shaped and baked per second. |
+
+Calling `controller.clear()` (or disposing `FlameBarrageWidget`) stops the frame pulses entirely, so a paused room costs nothing.
+
+---
+
 ## 🔬 Performance Philosophy
 
-FlameBarrage is engineered around three core principles:
+FlameBarrage is engineered around four core principles:
 
 1. **Minimize allocations**
 2. **Reduce framework overhead**
 3. **Maximize GPU utilization**
+4. **Rasterize each message once, not every frame**
 
 The result is a barrage engine capable of sustaining extremely high message throughput while maintaining smooth animations, stable frame pacing, and low memory pressure.
 
