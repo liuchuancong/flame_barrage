@@ -353,6 +353,11 @@ class BarrageEngine extends FlameGame with TapCallbacks {
       _emitTimer = 0.0;
       _dispatchWaiting(nowMs);
     }
+    // Warms the parser/layout caches for whatever is now at the front of
+    // the queue. Cheap once warm (hash lookup only), so paying it here on
+    // an otherwise-idle frame means the frame that actually fires the emit
+    // timer below doesn't also have to pay for paragraph shaping.
+    _prepareHead();
 
     final int len = _activeEntries.length;
 
@@ -405,6 +410,67 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     _suspendLoopIfIdle();
   }
 
+  bool _itemHasConfigOverrides(BarrageItem item) {
+    return item.textColor != null ||
+        item.fontSize != null ||
+        item.fontWeight != null ||
+        item.fontStyle != null ||
+        item.fontFamily != null ||
+        item.letterSpacing != null ||
+        item.opacity != null ||
+        item.showStroke != null ||
+        item.strokeColor != null ||
+        item.strokeWidth != null ||
+        item.showShadow != null ||
+        item.shadowColor != null ||
+        item.shadowBlur != null ||
+        item.shadowOffset != null ||
+        item.fixedDuration != null ||
+        item.emojiSize != null ||
+        item.baseSpeed != null ||
+        item.overlapSafeGap != null;
+  }
+
+  // The expensive part of dispatching a message is text shaping inside
+  // MixedLayout._buildParagraph (and it happens twice per text fragment
+  // when showStroke is on — once for fill, once for stroke). Left alone,
+  // that cost lands entirely in whichever frame the emit timer fires,
+  // stacked on top of track allocation and entry spawn in the same frame —
+  // a spike that's easy to miss on a fast device and a dropped frame on a
+  // slow one. An item usually sits at the front of _waiting for several
+  // frames before it's actually due, so shape it ahead of time here: both
+  // RichParser and MixedLayout cache by content/hash, so calling parse()
+  // and layout() again at dispatch time is just a cache hit once this has
+  // already run for the same head item.
+  void _prepareHead() {
+    if (_waiting.isEmpty) return;
+    final item = _waiting.first.item;
+    final resolvedConfig = _itemHasConfigOverrides(item)
+        ? _config.copyWith(
+            textColor: item.textColor,
+            fontSize: item.fontSize,
+            fontWeight: item.fontWeight,
+            fontStyle: item.fontStyle,
+            fontFamily: item.fontFamily,
+            letterSpacing: item.letterSpacing,
+            opacity: item.opacity,
+            showStroke: item.showStroke,
+            strokeColor: item.strokeColor,
+            strokeWidth: item.strokeWidth,
+            showShadow: item.showShadow,
+            shadowColor: item.shadowColor,
+            shadowBlur: item.shadowBlur,
+            shadowOffset: item.shadowOffset,
+            fixedDuration: item.fixedDuration,
+            emojiSize: item.emojiSize,
+            baseSpeed: item.baseSpeed,
+            overlapSafeGap: item.overlapSafeGap,
+          )
+        : _config;
+    final fragments = _parser.parse(item.content);
+    _layout.layout(fragments, item: item, config: resolvedConfig);
+  }
+
   void _dispatchWaiting(int now) {
     final wallNow = DateTime.now().millisecondsSinceEpoch;
     final maxAgeMs = _config.maxPendingAge.inMilliseconds.clamp(0, 600000);
@@ -414,26 +480,31 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     if (_waiting.isEmpty) return;
     if (_currentAliveCount >= _config.maxVisibleCount) return;
     final item = _waiting.first.item;
-    final resolvedConfig = _config.copyWith(
-      textColor: item.textColor,
-      fontSize: item.fontSize,
-      fontWeight: item.fontWeight,
-      fontStyle: item.fontStyle,
-      fontFamily: item.fontFamily,
-      letterSpacing: item.letterSpacing,
-      opacity: item.opacity,
-      showStroke: item.showStroke,
-      strokeColor: item.strokeColor,
-      strokeWidth: item.strokeWidth,
-      showShadow: item.showShadow,
-      shadowColor: item.shadowColor,
-      shadowBlur: item.shadowBlur,
-      shadowOffset: item.shadowOffset,
-      fixedDuration: item.fixedDuration,
-      emojiSize: item.emojiSize,
-      baseSpeed: item.baseSpeed,
-      overlapSafeGap: item.overlapSafeGap,
-    );
+    // copyWith allocates a whole new BarrageConfig (20+ fields). Most items
+    // in a real stream don't set any per-item style override, so skip the
+    // clone entirely and reuse the shared config in the common case.
+    final resolvedConfig = _itemHasConfigOverrides(item)
+        ? _config.copyWith(
+            textColor: item.textColor,
+            fontSize: item.fontSize,
+            fontWeight: item.fontWeight,
+            fontStyle: item.fontStyle,
+            fontFamily: item.fontFamily,
+            letterSpacing: item.letterSpacing,
+            opacity: item.opacity,
+            showStroke: item.showStroke,
+            strokeColor: item.strokeColor,
+            strokeWidth: item.strokeWidth,
+            showShadow: item.showShadow,
+            shadowColor: item.shadowColor,
+            shadowBlur: item.shadowBlur,
+            shadowOffset: item.shadowOffset,
+            fixedDuration: item.fixedDuration,
+            emojiSize: item.emojiSize,
+            baseSpeed: item.baseSpeed,
+            overlapSafeGap: item.overlapSafeGap,
+          )
+        : _config;
     _trackManager.initialize(resolvedConfig, _calculateAllowedHeight(size.y));
     if (_trackManager.tracks.isEmpty) return;
     final fragments = _parser.parse(item.content);
@@ -496,28 +567,57 @@ class BarrageEngine extends FlameGame with TapCallbacks {
     _currentAliveCount++;
   }
 
+  // Reused across calls so the steady-state path (track count unchanged)
+  // does zero allocation. Reallocated only when the track count itself
+  // changes (resize / config change), which is rare compared to the ~31
+  // calls/sec this runs at. Allocating 3 fresh Lists every call was cheap
+  // enough to be invisible on a phone's GC but shows up as periodic stutter
+  // on weaker TV hardware.
+  List<double> _trackSpeedBuf = const [];
+  List<int> _trackCountBuf = const [];
+  List<BarrageEntry?> _trackYoungestBuf = const [];
+
   void _updateTrackMetrics(int now) {
-    final entryLen = _activeEntries.length;
+    final tracks = _trackManager.tracks;
+    final trackCount = tracks.length;
+    if (trackCount == 0) return;
 
-    for (final track in _trackManager.tracks) {
-      double totalSpeed = 0.0;
-      int count = 0;
-      BarrageEntry? youngestEntry;
-
-      for (int i = 0; i < entryLen; i++) {
-        final entry = _activeEntries[i];
-        if (!entry.active) continue;
-        if (entry.track == track.index) {
-          totalSpeed += entry.speed;
-          count++;
-          if (youngestEntry == null || entry.x > youngestEntry.x) {
-            youngestEntry = entry;
-          }
-        }
+    if (_trackSpeedBuf.length != trackCount) {
+      _trackSpeedBuf = List<double>.filled(trackCount, 0.0);
+      _trackCountBuf = List<int>.filled(trackCount, 0);
+      _trackYoungestBuf = List<BarrageEntry?>.filled(trackCount, null);
+    } else {
+      for (int t = 0; t < trackCount; t++) {
+        _trackSpeedBuf[t] = 0.0;
+        _trackCountBuf[t] = 0;
+        _trackYoungestBuf[t] = null;
       }
+    }
+
+    final entryLen = _activeEntries.length;
+    for (int i = 0; i < entryLen; i++) {
+      final entry = _activeEntries[i];
+      if (!entry.active) continue;
+      final trackIndex = entry.track;
+      if (trackIndex < 0 || trackIndex >= trackCount) continue;
+
+      _trackSpeedBuf[trackIndex] += entry.speed;
+      _trackCountBuf[trackIndex]++;
+      final current = _trackYoungestBuf[trackIndex];
+      if (current == null || entry.x > current.x) {
+        _trackYoungestBuf[trackIndex] = entry;
+      }
+    }
+
+    final screenWidth = size.x;
+    for (int t = 0; t < trackCount; t++) {
+      final track = tracks[t];
+      final count = _trackCountBuf[t];
       track.activeCount = count;
-      track.avgSpeed = count == 0 ? 0.0 : totalSpeed / count;
-      track.density = size.x > 0 ? (count * 150.0) / size.x : 0.0;
+      track.avgSpeed = count == 0 ? 0.0 : _trackSpeedBuf[t] / count;
+      track.density = screenWidth > 0 ? (count * 150.0) / screenWidth : 0.0;
+
+      final youngestEntry = _trackYoungestBuf[t];
       if (youngestEntry != null) {
         track.lastRight = youngestEntry.x + youngestEntry.width;
         track.lastEntry = youngestEntry;
@@ -587,27 +687,48 @@ class BarrageEngine extends FlameGame with TapCallbacks {
   }
 
   String buildCacheKey(BarrageItem item) {
-    return [
-      item.content,
-      item.type.name,
-      item.fontSize ?? _config.fontSize,
-      (item.fontWeight ?? _config.fontWeight).toString(),
-      (item.fontStyle ?? _config.fontStyle).name,
-      (item.textColor ?? _config.textColor).toARGB32(),
-      item.emojiSize ?? _config.emojiSize,
-      item.fontFamily ?? _config.fontFamily ?? '',
-      item.letterSpacing ?? _config.letterSpacing,
-      item.showStroke ?? _config.showStroke,
-      item.strokeWidth ?? _config.strokeWidth,
-      (item.strokeColor ?? _config.strokeColor).toARGB32(),
-      item.showShadow ?? _config.showShadow,
-      (item.shadowColor ?? _config.shadowColor).toARGB32(),
-      item.shadowBlur ?? _config.shadowBlur,
-      item.shadowOffset ?? _config.shadowOffset,
-      item.opacity ?? _config.opacity,
-      item.fixedDuration ?? _config.fixedDuration,
-      _config.noEmojiMode,
-    ].join('|');
+    // Runs once per dispatched item. A StringBuffer avoids allocating the
+    // intermediate List<Object> (with its boxed doubles/bools) that
+    // List.join would otherwise build just to throw away.
+    final buffer = StringBuffer()
+      ..write(item.content)
+      ..write('|')
+      ..write(item.type.name)
+      ..write('|')
+      ..write(item.fontSize ?? _config.fontSize)
+      ..write('|')
+      ..write(item.fontWeight ?? _config.fontWeight)
+      ..write('|')
+      ..write((item.fontStyle ?? _config.fontStyle).name)
+      ..write('|')
+      ..write((item.textColor ?? _config.textColor).toARGB32())
+      ..write('|')
+      ..write(item.emojiSize ?? _config.emojiSize)
+      ..write('|')
+      ..write(item.fontFamily ?? _config.fontFamily ?? '')
+      ..write('|')
+      ..write(item.letterSpacing ?? _config.letterSpacing)
+      ..write('|')
+      ..write(item.showStroke ?? _config.showStroke)
+      ..write('|')
+      ..write(item.strokeWidth ?? _config.strokeWidth)
+      ..write('|')
+      ..write((item.strokeColor ?? _config.strokeColor).toARGB32())
+      ..write('|')
+      ..write(item.showShadow ?? _config.showShadow)
+      ..write('|')
+      ..write((item.shadowColor ?? _config.shadowColor).toARGB32())
+      ..write('|')
+      ..write(item.shadowBlur ?? _config.shadowBlur)
+      ..write('|')
+      ..write(item.shadowOffset ?? _config.shadowOffset)
+      ..write('|')
+      ..write(item.opacity ?? _config.opacity)
+      ..write('|')
+      ..write(item.fixedDuration ?? _config.fixedDuration)
+      ..write('|')
+      ..write(_config.noEmojiMode);
+    return buffer.toString();
   }
 
   @override
