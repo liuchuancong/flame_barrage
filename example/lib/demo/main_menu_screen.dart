@@ -37,6 +37,14 @@ class MainMenuScreen extends StatelessWidget {
           ),
           _buildMenuListRow(
             context,
+            icon: Icons.touch_app_rounded,
+            title: 'Tap-to-hold interaction',
+            subtitle: 'Freeze a message on tap, act on it (like / block / report), release to continue',
+            route: '/tap_pause',
+            color: const Color(0xFF13C2C2),
+          ),
+          _buildMenuListRow(
+            context,
             icon: Icons.crop_landscape_rounded,
             title: 'Multi-surface, single controller',
             subtitle: 'Fullscreen and PiP surfaces sharing one BarrageController',

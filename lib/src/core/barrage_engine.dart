@@ -434,6 +434,35 @@ class BarrageEngine extends FlameGame with TapCallbacks implements BarrageEngine
     return true;
   }
 
+  /// Holds the top-most message at the point in place. While held it neither
+  /// scrolls nor expires, so the host can present an action sheet on it and
+  /// resume it afterwards via [resumeAllPaused].
+  @override
+  BarrageItem? pauseItemAt(double x, double y) {
+    final entry = _renderSystem.entryAt(x, y);
+    if (entry == null) return null;
+    entry.paused = true;
+    return entry.item;
+  }
+
+  @override
+  void resumeAllPaused() {
+    final entries = _ctx.activeEntries;
+    for (int i = 0; i < entries.length; i++) {
+      entries[i].paused = false;
+    }
+  }
+
+  @override
+  int get pausedCount {
+    final entries = _ctx.activeEntries;
+    int count = 0;
+    for (int i = 0; i < entries.length; i++) {
+      if (entries[i].paused) count++;
+    }
+    return count;
+  }
+
   @override
   Color backgroundColor() => Colors.transparent;
 

@@ -351,6 +351,25 @@ final handled = controller.triggerItemAt(x, y, longPress: false);
 
 命中测试按从后往前的顺序遍历在屏条目；未挂回调的消息不会抢占手势。
 
+#### 点击暂停（操作面板流程）
+
+常见产品流程：点击弹幕冻结该条，弹出屏蔽/举报/点赞面板，操作完成后释放继续滚动。引擎会在暂停期间保持该条不动——既不滚动也不到期：
+
+```dart
+final item = controller.pauseItemAt(x, y);   // 未命中返回 null
+if (item != null) {
+  final action = await showActionSheet(item.userId, item.content);
+  // ... 屏蔽该用户 / 提交举报 / 点赞 ...
+}
+controller.resumeAllPaused();                // 被冻结的弹幕从原地继续滚动
+```
+
+| 成员 | 说明 |
+| --- | --- |
+| `controller.pauseItemAt(x, y)` | 冻结命中点最上层的弹幕并返回它（未命中返回 null）；被冻结的弹幕保持位置与轨道 |
+| `controller.resumeAllPaused()` | 释放全部被冻结的弹幕 |
+| `controller.pausedCount` | 当前被冻结的弹幕数量 |
+
 ### 扩展渲染
 
 **`BarrageEffectInterceptor`**——拦截匹配的消息并替换为自定义 `LayoutSpan`：

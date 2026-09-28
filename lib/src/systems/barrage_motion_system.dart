@@ -31,6 +31,17 @@ class BarrageMotionSystem extends Component {
     while (i < len) {
       final entry = entries[i];
       final fx = entry.fx;
+      if (entry.paused) {
+        // Held by the host (e.g. an action sheet is open on it). Absorb the
+        // elapsed time so resuming never jumps, and push the expiry forward
+        // so pinned dwell does not run out while the user decides. Scroll
+        // entries simply keep their position; effect choreography freezes.
+        final deltaMs = (now - entry.lastUpdateTime).clamp(0.0, maxDeltaMs);
+        entry.lastUpdateTime = now;
+        entry.expireTime += deltaMs.round();
+        i++;
+        continue;
+      }
       if (fx != null) {
         final deltaMs = (now - entry.lastUpdateTime).clamp(0.0, maxDeltaMs);
         entry.lastUpdateTime = now;

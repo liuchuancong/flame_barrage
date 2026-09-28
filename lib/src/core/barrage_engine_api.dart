@@ -29,6 +29,19 @@ abstract class BarrageEngineApi {
   /// callback. Returns true when a message was hit and the callback fired.
   bool triggerItemAt(double x, double y, {required bool longPress});
 
+  /// Hit-tests the point and holds the top-most message in place. The paused
+  /// message neither scrolls nor expires until [resumeAllPaused] runs, so the
+  /// host can open an action sheet (block / report / like) on it. Returns the
+  /// held message, or null when nothing was hit.
+  BarrageItem? pauseItemAt(double x, double y);
+
+  /// Releases every message held by [pauseItemAt]; they continue from the
+  /// exact position they were frozen at.
+  void resumeAllPaused();
+
+  /// Number of messages currently held in place.
+  int get pausedCount;
+
   /// Number of entries held in the render cache.
   int get activeCacheSize;
 

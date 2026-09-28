@@ -9,6 +9,7 @@ import 'performance_demo_screen.dart';
 import 'package:flutter/material.dart';
 import 'video_player_demo_screen.dart';
 import 'sprite_sheet_demo_screen.dart';
+import 'tap_pause_demo_screen.dart';
 import 'custom_effect_demo_screen.dart';
 import 'combo_animation_demo_screen.dart';
 import 'barrage_config_panel_screen.dart';
@@ -38,6 +39,7 @@ class BarrageRouter {
         },
       ),
       '/multi_screen_barrage': (context) => const MultiScreenBarrageDemoScreen(),
+      '/tap_pause': (context) => const TapPauseDemoScreen(),
       '/item_style_demo': (context) => const BarrageItemStyleDemoScreen(),
     };
   }

@@ -39,6 +39,11 @@ class BarrageEntry {
   /// inactive, so anything inside the list is expected to be active.
   bool active = true;
 
+  /// Held in place by the host (e.g. a tap opened an action sheet). While
+  /// paused the entry neither moves nor expires; time spent paused is not
+  /// counted against pinned dwell time.
+  bool paused = false;
+
   // =========================
   // Timing
   // =========================
@@ -100,6 +105,7 @@ class BarrageEntry {
     track = -1;
     speed = 0;
     active = true;
+    paused = false;
 
     spawnTime = 0;
     expireTime = 0;

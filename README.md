@@ -355,6 +355,25 @@ final handled = controller.triggerItemAt(x, y, longPress: false);
 
 Hit testing runs back-to-front over the live entry list; messages without callbacks never claim the gesture.
 
+#### Tap-to-hold (action sheet flow)
+
+A common product flow: tap a message to freeze it, present block/report/like actions, then release it to continue scrolling. The engine holds the message in place — it neither scrolls nor expires while held:
+
+```dart
+final item = controller.pauseItemAt(x, y);   // null when nothing was hit
+if (item != null) {
+  final action = await showActionSheet(item.userId, item.content);
+  // ... block the user, file a report, or like ...
+}
+controller.resumeAllPaused();                // held messages continue from the spot they froze at
+```
+
+| Member | Description |
+| --- | --- |
+| `controller.pauseItemAt(x, y)` | Holds the top-most message at the point; returns it (or null on a miss). Held messages keep their position and lane |
+| `controller.resumeAllPaused()` | Releases every held message |
+| `controller.pausedCount` | How many messages are currently held |
+
 ### Extending Rendering
 
 **`BarrageEffectInterceptor`** — intercept matching messages and substitute a custom `LayoutSpan`:

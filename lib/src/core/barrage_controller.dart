@@ -56,6 +56,17 @@ class BarrageController {
     return _engine?.triggerItemAt(x, y, longPress: longPress) ?? false;
   }
 
+  /// Holds the top-most message at the point in place (it neither scrolls nor
+  /// expires) and returns it, so the host can present an action sheet on it.
+  /// Returns null when the point hits nothing.
+  BarrageItem? pauseItemAt(double x, double y) => _engine?.pauseItemAt(x, y);
+
+  /// Releases every held message; they continue from where they froze.
+  void resumeAllPaused() => _engine?.resumeAllPaused();
+
+  /// Number of messages currently held in place.
+  int get pausedCount => _engine?.pausedCount ?? 0;
+
   int get totalEmitted => _totalEmittedCount;
 
   int get pictureCacheCount => _engine?.activeCacheSize ?? 0;
