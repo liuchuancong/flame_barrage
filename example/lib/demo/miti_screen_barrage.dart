@@ -198,12 +198,11 @@ class SmallBarrageScreen extends StatefulWidget {
 }
 
 class _SmallBarrageScreenState extends State<SmallBarrageScreen> {
-  @override
-  void dispose() {
-    widget.controller.detach();
-    super.dispose();
-  }
-
+  // No controller bookkeeping here: FlameBarrageWidget.dispose detaches its
+  // own engine with a guarded detach, so a later-attached engine survives the
+  // surface swap. Calling controller.detach() with no argument here would
+  // clear whatever engine the next surface already attached (old elements
+  // dispose after the new one mounts), silently dropping every message.
   @override
   Widget build(BuildContext context) {
     return Positioned(
@@ -238,12 +237,7 @@ class FullBarrageScreen extends StatefulWidget {
 }
 
 class _FullBarrageScreenState extends State<FullBarrageScreen> {
-  @override
-  void dispose() {
-    widget.controller.detach();
-    super.dispose();
-  }
-
+  // See _SmallBarrageScreenState: no detach here for the same reason.
   @override
   Widget build(BuildContext context) {
     return Positioned.fill(
