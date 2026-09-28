@@ -62,7 +62,7 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
         for (int i = 0; i < 5; i++) {
           _singletonController.send(
             BarrageItem(
-              content: '显存压测弹幕流水线 #${_singletonController.totalEmitted + 1} [滑稽]随机码:${DateTime.now().microsecond}',
+              content: 'VRAM stress pipeline #${_singletonController.totalEmitted + 1} [滑稽] code:${DateTime.now().microsecond}',
               type: BarrageType.scroll,
             ),
           );
@@ -80,7 +80,7 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
       _pictureCacheCount = 0;
       _poolObjectCount = 0;
     });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已强制解构视口及二级缓存，显存已安全回落！')));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Viewport and secondary caches force-released; VRAM reclaimed.')));
   }
 
   @override
@@ -95,7 +95,7 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
     final currentConfig = BarrageRouter.globalConfig;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('真机显存与常驻内存监控')),
+      appBar: AppBar(title: const Text('On-device VRAM & Memory Monitor')),
       body: Column(
         children: [
           Container(
@@ -103,22 +103,22 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
             color: const Color(0xFF1E1E1E),
             child: Column(
               children: [
-                _buildMetricRow('累计发射总数', '$_totalEmitted 条', Colors.blue),
+                _buildMetricRow('Total dispatched', '$_totalEmitted', Colors.blue),
                 const SizedBox(height: 8),
                 _buildMetricRow(
-                  '弹幕位图硬件缓存 (LRU)',
+                  'Bitmap render cache (LRU)',
                   '$_pictureCacheCount / ${currentConfig.pictureCacheMaxSize}',
                   Colors.orange,
                 ),
                 const SizedBox(height: 8),
                 _buildMetricRow(
-                  '位图显存占用 / 同屏弹幕数',
-                  '${(_rasterCacheBytes / 1048576).toStringAsFixed(1)} MB / $_activeItemCount 条',
+                  'Bitmap VRAM / on-screen count',
+                  '${(_rasterCacheBytes / 1048576).toStringAsFixed(1)} MB / $_activeItemCount',
                   Colors.purpleAccent,
                 ),
                 const SizedBox(height: 8),
                 _buildMetricRow(
-                  'BarragePool 常驻组件复用数',
+                  'BarragePool pooled entries',
                   '$_poolObjectCount / ${currentConfig.barragePoolMaxSize}',
                   Colors.green,
                 ),
@@ -148,14 +148,14 @@ class _MemoryProfileScreenState extends State<MemoryProfileScreen> {
                       ),
                       onPressed: _toggleFloodStressTest,
                       icon: Icon(_isFlooding ? Icons.pause : Icons.play_arrow),
-                      label: Text(_isFlooding ? '暂停 300发/秒 洪峰轰炸' : '开启 300发/秒 洪峰轰炸'),
+                      label: Text(_isFlooding ? 'Pause 300 msg/s flood' : 'Start 300 msg/s flood'),
                     ),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey, minimumSize: const Size(100, 48)),
                     onPressed: _executeHardClear,
-                    child: const Text('一键销毁释放'),
+                    child: const Text('Destroy and release'),
                   ),
                 ],
               ),

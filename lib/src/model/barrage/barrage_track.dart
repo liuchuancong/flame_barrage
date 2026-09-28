@@ -5,24 +5,30 @@ class BarrageTrack {
 
   final int index;
 
-  /// 最右边界
+  /// Right edge of the youngest (rightmost) entry in this lane, in screen
+  /// coordinates. Lane allocation uses it to decide whether the next message
+  /// can enter without rear-ending the previous one.
   double lastRight = 0;
 
-  /// 当前轨道弹幕数
+  /// Number of live entries currently assigned to this lane.
   int activeCount = 0;
 
-  /// 固定弹幕占用
+  /// Set while a fixed (pinned) message occupies the lane; scroll messages
+  /// must not enter a locked lane.
   bool locked = false;
 
   /// Monotonic engine time at which a fixed item releases this lane.
   int lockedUntil = 0;
 
-  /// 最近一次发射时间
+  /// Engine time of the most recent launch into this lane.
   int lastLaunchTime = 0;
 
   BarrageEntry? lastEntry;
 
+  /// Mean scroll speed of this lane's live entries, updated by the metrics
+  /// system a few times per second. Feeds the lane-penalty heuristic.
   double avgSpeed = 0;
 
+  /// Rough occupancy ratio of this lane relative to the screen width.
   double density = 0;
 }

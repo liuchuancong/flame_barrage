@@ -31,7 +31,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       for (int i = 0; i < 3; i++) {
-        _controller.send(const BarrageItem(content: '🚀 引擎监测总线已激活 - 帧率度量就绪', type: BarrageType.scroll));
+        _controller.send(const BarrageItem(content: '🚀 Engine telemetry active - FPS sampling ready', type: BarrageType.scroll));
       }
     });
   }
@@ -56,7 +56,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
             _stressMessageIndex++;
             _controller.send(
               BarrageItem(
-                content: '🔥 300发/s极限压测 💥 [流水线No.$_stressMessageIndex] - 实时测试硬件吞吐量线',
+                content: '🔥 300 msg/s stress test 💥 [pipeline #$_stressMessageIndex] - live hardware throughput probe',
                 type: BarrageType.scroll,
               ),
             );
@@ -85,7 +85,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
         elevation: 0,
         backgroundColor: const Color(0xFF1F1F1F),
         title: const Text(
-          '内核性能度量与全局参数同步',
+          'Engine metrics and live config sync',
           style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -116,7 +116,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('渲染引擎实时帧率 (FPS)', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                      const Text('Render engine FPS', style: TextStyle(color: Colors.white38, fontSize: 12)),
                       const SizedBox(height: 6),
                       Text(
                         '${_currentFps.toStringAsFixed(1)} Hz',
@@ -140,7 +140,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
                   onPressed: _toggleStressTest,
                   icon: Icon(_isStressTesting ? Icons.stop_circle_outlined : Icons.bolt, size: 16),
                   label: Text(
-                    _isStressTesting ? '停止压测泵' : '开启300发/s压测',
+                    _isStressTesting ? 'Stop stress pump' : 'Start 300 msg/s stress',
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -178,7 +178,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      '当前同步内核配置：字号 ${currentConfig.fontSize}px | 轨道高度 ${currentConfig.trackHeight}px',
+                      'Live engine config: fontSize ${currentConfig.fontSize}px | trackHeight ${currentConfig.trackHeight}px',
                       style: const TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'monospace'),
                     ),
                   ),

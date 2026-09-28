@@ -60,13 +60,13 @@ class _BarrageLiveBodyState extends State<BarrageLiveBody> {
   ];
 
   final List<Map<String, dynamic>> _mockWsPackets = [
-    {'content': '全屏走一波！！！', 'type': 'scroll', 'vip': true},
-    {'content': '主播操作有点迷啊 [滑稽]', 'type': 'scroll', 'vip': false},
-    {'content': '看得我直接 [震惊] 了', 'type': 'scroll', 'vip': true},
-    {'content': '送上一朵小红花 [送花]', 'type': 'scroll', 'vip': false},
-    {'content': '完蛋，又要白给了 [难受]', 'type': 'scroll', 'vip': false},
-    {'content': '前方名场面高能预警！', 'type': 'topFixed', 'vip': true},
-    {'content': '下播了下播了，大家 [拜拜]', 'type': 'bottomFixed', 'vip': false},
+    {'content': 'Full-screen wave!!!', 'type': 'scroll', 'vip': true},
+    {'content': 'That play was questionable [滑稽]', 'type': 'scroll', 'vip': false},
+    {'content': 'I am literally [震惊] right now', 'type': 'scroll', 'vip': true},
+    {'content': 'A little flower for the streamer [送花]', 'type': 'scroll', 'vip': false},
+    {'content': 'Welp, thrown again [难受]', 'type': 'scroll', 'vip': false},
+    {'content': 'Highlight moment incoming!', 'type': 'topFixed', 'vip': true},
+    {'content': 'Stream ending, see you all [拜拜]', 'type': 'bottomFixed', 'vip': false},
   ];
 
   @override
@@ -167,7 +167,7 @@ class _BarrageLiveBodyState extends State<BarrageLiveBody> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('高并发直播间模拟')),
+      appBar: AppBar(title: const Text('High-Concurrency Live Room')),
       body: Column(
         children: [
           Expanded(
@@ -187,7 +187,7 @@ class _BarrageLiveBodyState extends State<BarrageLiveBody> {
                             children: [
                               CircularProgressIndicator(color: Colors.orangeAccent),
                               SizedBox(height: 12),
-                              Text('正在为您原地异步硬解图片纹理...', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                              Text('Decoding textures asynchronously...', style: TextStyle(color: Colors.white70, fontSize: 13)),
                             ],
                           ),
                         ),
@@ -208,20 +208,20 @@ class _BarrageLiveBodyState extends State<BarrageLiveBody> {
                       children: [
                         ActionChip(
                           avatar: const Icon(Icons.sentiment_very_satisfied, size: 16, color: Colors.orangeAccent),
-                          label: const Text('滑稽'),
-                          onPressed: () => _quickSendEmoji('这波真骚 [滑稽]'),
+                          label: const Text('[滑稽]'),
+                          onPressed: () => _quickSendEmoji('What a play [滑稽]'),
                         ),
                         const SizedBox(width: 8),
                         ActionChip(
                           avatar: const Icon(Icons.bolt, size: 16, color: Colors.cyanAccent),
-                          label: const Text('震惊'),
-                          onPressed: () => _quickSendEmoji('我的天呐 [震惊]'),
+                          label: const Text('[震惊]'),
+                          onPressed: () => _quickSendEmoji('Oh my god [震惊]'),
                         ),
                         const SizedBox(width: 8),
                         ActionChip(
                           avatar: const Icon(Icons.card_giftcard, size: 16, color: Colors.pinkAccent),
-                          label: const Text('送花'),
-                          onPressed: () => _quickSendEmoji('给主播点赞 [送花]'),
+                          label: const Text('[送花]'),
+                          onPressed: () => _quickSendEmoji('Like for the streamer [送花]'),
                         ),
                       ],
                     ),
@@ -233,14 +233,14 @@ class _BarrageLiveBodyState extends State<BarrageLiveBody> {
                         child: TextField(
                           controller: _textController,
                           decoration: const InputDecoration(
-                            hintText: '输入文本或使用上方快捷表情...',
+                            hintText: 'Type a message or tap a quick emoji above...',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      ElevatedButton(onPressed: () => _sendSingleMessage(BarrageType.scroll), child: const Text('发送')),
+                      ElevatedButton(onPressed: () => _sendSingleMessage(BarrageType.scroll), child: const Text('Send')),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -250,19 +250,19 @@ class _BarrageLiveBodyState extends State<BarrageLiveBody> {
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: _isConnected ? Colors.red : Colors.green),
                         onPressed: _toggleWebSocketConnection,
-                        child: Text(_isConnected ? '断开长连接' : '开启高并发长连接 (WS)'),
+                        child: Text(_isConnected ? 'Disconnect' : 'Connect high-concurrency feed (WS)'),
                       ),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _controller.running ? Colors.blue : Colors.orange,
                         ),
                         onPressed: _togglePauseEngine,
-                        child: Text(_controller.running ? '暂停弹幕' : '恢复弹幕'),
+                        child: Text(_controller.running ? 'Pause barrage' : 'Resume barrage'),
                       ),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
                         onPressed: () => _controller.clear(),
-                        child: const Text('一键清屏'),
+                        child: const Text('Clear screen'),
                       ),
                     ],
                   ),

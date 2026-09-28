@@ -1,61 +1,92 @@
 import 'dart:ui';
 import 'barrage_item.dart';
 import '../../cache/render_cache.dart';
+import '../../effect/motion/barrage_motion_effect.dart';
 
+/// Runtime state of one message that is (or is about to be) on screen.
+///
+/// Instances are pooled: the engine obtains them from [BarragePool.obtain]
+/// and returns them via resettable fields, so this class intentionally uses
+/// mutable fields instead of finals. The [reset] contract is that every
+/// field must return to a defined initial value — when adding a field here,
+/// remember to clear it in [reset] as well.
 class BarrageEntry {
   BarrageEntry({required this.item, required this.creationTime});
 
-  // =========================
-  // 基础数据
-  // =========================
+  /// The immutable message being displayed.
   BarrageItem item;
 
-  /// 创建时间（逻辑时间）
+  /// Engine time at which the entry object was created, in milliseconds.
   int creationTime;
 
   // =========================
-  // 位置
+  // Position
   // =========================
+  /// Screen-space position and size of the laid-out content, in logical
+  /// pixels. [x]/[y] are the top-left corner of the content bounds.
   double x = 0;
   double y = 0;
   double width = 0;
   double height = 0;
 
+  /// Index of the lane this entry occupies; -1 before dispatch.
   int track = -1;
+
+  /// Scroll velocity in logical pixels per second; always 0 for fixed types.
   double speed = 0;
+
+  /// Entries are removed from the active list the same frame they turn
+  /// inactive, so anything inside the list is expected to be active.
   bool active = true;
 
   // =========================
-  // 🧠 v2 时间系统（核心）
+  // Timing
   // =========================
 
-  /// 弹幕进入屏幕时间
+  /// Engine time the message was dispatched to a lane, in milliseconds.
   int spawnTime = 0;
 
-  /// 结束时间（fixed / scroll统一用这个）
+  /// Engine time at which a fixed message expires, in milliseconds. Scroll
+  /// messages leave the screen by moving out of view instead.
   int expireTime = 0;
 
-  /// 上次更新位置时间（用于 delta motion）
-  int lastUpdateTime = 0;
+  /// Logical time of the last position integration, in milliseconds with
+  /// sub-millisecond precision. Motion deltas are computed against it.
+  double lastUpdateTime = 0;
 
   // =========================
-  // 渲染缓存
+  // Render artifacts
   // =========================
+
+  /// Unused. Layout paragraphs live on the [LayoutSpan]s owned by the
+  /// layout cache; these fields predate that design and are kept only for
+  /// source compatibility.
   Paragraph? paragraph;
   Paragraph? strokeParagraph;
 
-  /// 本条弹幕实际绘制的矢量录制（引用缓存条目，不要单独 dispose）
+  /// Vector recording used when no rasterized bitmap is available. Points at
+  /// the shared [CachedRender.picture]; never disposed from here.
   Picture? picture;
   String? pictureCacheKey;
 
-  /// 缓存条目，持有本条的绘制资源引用计数；回收时必须 release
+  /// Shared render artifact backing [picture] and [image]. The engine holds
+  /// one reference claim for the lifetime of the entry and must hand it back
+  /// to the render cache on recycle.
   CachedRender? render;
+
+  /// Motion-effect show state. Non-null only while a [BarrageMotionEffect]
+  /// owns this entry's choreography: the motion system advances it, the
+  /// render system applies its transform, and the effect drives x/y itself
+  /// instead of the default scroll/fixed movement.
+  BarrageFxState? fx;
 
   double? cachedWidth;
 
   // =========================
-  // reset（必须同步 v2 字段）
+  // reset
   // =========================
+  /// Returns the entry to a clean state before it is handed out again.
+  /// Every field above must be covered here.
   void reset({required BarrageItem newItem, required int newCreationTime}) {
     item = newItem;
 
@@ -79,6 +110,7 @@ class BarrageEntry {
     picture = null;
     pictureCacheKey = null;
     render = null;
+    fx = null;
     cachedWidth = null;
   }
 }

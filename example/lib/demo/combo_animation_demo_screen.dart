@@ -44,7 +44,7 @@ class _ComboAnimationDemoScreenState extends State<ComboAnimationDemoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('礼物连击 Combo 特效测试')),
+      appBar: AppBar(title: const Text('Gift Combo Animation Test')),
       body: Column(
         children: [
           Expanded(
@@ -53,7 +53,7 @@ class _ComboAnimationDemoScreenState extends State<ComboAnimationDemoScreen> {
                 Container(
                   color: const Color(0xFF1A1A1A),
                   child: Center(
-                    child: Text('当前连续送礼次数: $_comboCount', style: const TextStyle(color: Colors.white24, fontSize: 18)),
+                    child: Text('Current combo count: $_comboCount', style: const TextStyle(color: Colors.white24, fontSize: 18)),
                   ),
                 ),
                 Positioned.fill(child: GameWidget(game: _game)),
@@ -74,7 +74,7 @@ class _ComboAnimationDemoScreenState extends State<ComboAnimationDemoScreen> {
                       onPressed: _triggerGiftCombo,
                       icon: const Icon(Icons.card_giftcard, color: Colors.black87),
                       label: const Text(
-                        '送出小电视 (Combo!)',
+                        'Send TV (Combo!)',
                         style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),

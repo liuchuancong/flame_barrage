@@ -8,6 +8,7 @@ class BarrageItem {
     this.userId,
     this.userName,
     this.priority = 0,
+    this.effect,
     this.textColor,
     this.fontSize,
     this.fontWeight,
@@ -40,6 +41,11 @@ class BarrageItem {
   final String? userId;
   final String? userName;
   final int priority;
+
+  /// Motion effect: when non-null, [BarrageMotionEffect] takes over the
+  /// choreography for this message (entrance, cruise path, exit, hand-drawn
+  /// mount and particles) and the message owns a lane for the whole show.
+  final BarrageMotionEffect? effect;
 
   final Color? textColor;
   final double? fontSize;

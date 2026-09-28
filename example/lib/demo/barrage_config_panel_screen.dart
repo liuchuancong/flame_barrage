@@ -17,7 +17,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
   Timer? _floodTimer;
   int _floodIndex = 0;
 
-  // 原有参数
+  // Core tuning parameters
   double _fontSize = 20.0;
   FontWeight _fontWeight = FontWeight.w500;
   bool _showStroke = true;
@@ -26,6 +26,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
   double _emojiSize = 24.0;
   int _maxVisibleCount = 150;
   double _emitInterval = 0.05;
+  bool _realtimeMode = false;
   int _barragePoolMaxSize = 150;
   int _pictureCacheMaxSize = 200;
   bool _rasterizeItems = true;
@@ -36,7 +37,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
   bool _hideBottom = false;
   bool _hideScroll = false;
 
-  // 补充的新参数
+  // Appearance parameters
   Color _textColor = Colors.white;
   Color _strokeColor = Colors.black;
   double _opacity = 1.0;
@@ -71,6 +72,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
     _emojiSize = config.emojiSize;
     _maxVisibleCount = config.maxVisibleCount;
     _emitInterval = config.emitInterval;
+    _realtimeMode = config.realtimeMode;
     _baseSpeed = config.baseSpeed;
     _overlapSafeGap = config.overlapSafeGap;
     _noEmojiMode = config.noEmojiMode;
@@ -101,6 +103,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
       emojiSize: _emojiSize,
       maxVisibleCount: _maxVisibleCount,
       emitInterval: _emitInterval,
+      realtimeMode: _realtimeMode,
       baseSpeed: _baseSpeed,
       overlapSafeGap: _overlapSafeGap,
       noEmojiMode: _noEmojiMode,
@@ -123,7 +126,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
 
     _controller.updateConfig(updatedConfig);
     widget.onConfigChanged(updatedConfig);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('内核配置重载成功，已实时应用到渲染管线！')));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Config reloaded and applied to the render pipeline!')));
   }
 
   @override
@@ -140,7 +143,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF141414),
       appBar: AppBar(
-        title: const Text('弹幕引擎内核高级配置控制台'),
+        title: const Text('Engine Advanced Configuration Console'),
         actions: [
           IconButton(
             icon: const Icon(Icons.check, color: Colors.greenAccent),
@@ -177,13 +180,13 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               icon: const Icon(Icons.rocket_launch_rounded, size: 20),
-              label: Text('发射当前配置验证弹幕 (当前字号: ${_fontSize.toInt()}px)'),
+              label: Text('Send a verification barrage (fontSize: ${_fontSize.toInt()}px)'),
               onPressed: () {
                 _floodIndex++;
                 _controller.send(
                   BarrageItem(
                     content:
-                        '⚙️ 物理管线瞬时点射 #$_floodIndex -> 当前字号:${_fontSize.toInt()}px | 物理轨道:${_trackHeight.toInt()}px | 实时速度:${_baseSpeed.toInt()}px/s',
+                        '⚙️ Pipeline burst #$_floodIndex -> fontSize: ${_fontSize.toInt()}px | trackHeight: ${_trackHeight.toInt()}px | speed: ${_baseSpeed.toInt()}px/s',
                     type: BarrageType.scroll,
                   ),
                 );
@@ -195,9 +198,9 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
-                _buildSectionTitle('🎨 视觉样式与图层空间'),
+                _buildSectionTitle('🎨 Visual style & layout'),
                 _buildSliderSetting(
-                  '字体大小 (fontSize)',
+                  'Font size (fontSize)',
                   _fontSize,
                   12,
                   36,
@@ -209,7 +212,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                 ),
                 _buildDropdownFontWeight(),
                 _buildColorPickerSetting(
-                  '文字颜色 (textColor)',
+                  'Text color (textColor)',
                   _textColor,
                   (v) => setState(() {
                     _textColor = v;
@@ -217,7 +220,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildColorPickerSetting(
-                  '描边颜色 (strokeColor)',
+                  'Stroke color (strokeColor)',
                   _strokeColor,
                   (v) => setState(() {
                     _strokeColor = v;
@@ -225,7 +228,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  '透明度 (opacity)',
+                  'Opacity (opacity)',
                   _opacity,
                   0.0,
                   1.0,
@@ -236,7 +239,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSwitchSetting(
-                  '开启硬核文字描边 (showStroke)',
+                  'Text stroke (showStroke)',
                   _showStroke,
                   (v) => setState(() {
                     _showStroke = v;
@@ -244,7 +247,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  '屏幕垂直空间占用比 (area)',
+                  'Vertical area ratio (area)',
                   _area,
                   0.1,
                   1.0,
@@ -255,7 +258,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  '顶部距离 (topAreaDistance)',
+                  'Top inset (topAreaDistance)',
                   _topAreaDistance,
                   0,
                   100,
@@ -266,7 +269,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  '底部距离 (bottomAreaDistance)',
+                  'Bottom inset (bottomAreaDistance)',
                   _bottomAreaDistance,
                   0,
                   100,
@@ -277,7 +280,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  '单物理轨道高度 (trackHeight)',
+                  'Lane height (trackHeight)',
                   _trackHeight,
                   24,
                   60,
@@ -288,7 +291,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  '行内 Emoji 渲染尺寸 (emojiSize)',
+                  'Inline emoji size (emojiSize)',
                   _emojiSize,
                   16,
                   48,
@@ -300,9 +303,9 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                 ),
 
                 const Divider(height: 32),
-                _buildSectionTitle('⏱️ 时间与速度控制'),
+                _buildSectionTitle('⏱️ Timing & speed'),
                 _buildDurationSetting(
-                  '固定弹幕持续时间 (fixedDuration)',
+                  'Pinned duration (fixedDuration)',
                   _fixedDuration,
                   (v) => setState(() {
                     _fixedDuration = v;
@@ -310,7 +313,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  '基础移动速度 (baseSpeed)',
+                  'Base speed (baseSpeed)',
                   _baseSpeed,
                   10.0,
                   500.0,
@@ -321,7 +324,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  '帧率 (fps)',
+                  'Frame rate (fps)',
                   _fps.toDouble(),
                   30,
                   120,
@@ -333,9 +336,9 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                 ),
 
                 const Divider(height: 32),
-                _buildSectionTitle('⚡ 高并发流控与发射频率'),
+                _buildSectionTitle('⚡ Flow control & dispatch'),
                 _buildSliderSetting(
-                  '同屏最大可见弹幕数 (maxVisibleCount)',
+                  'Max on-screen messages (maxVisibleCount)',
                   _maxVisibleCount.toDouble(),
                   10,
                   300,
@@ -346,7 +349,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  '高频发射泵间隔时间 (emitInterval)',
+                  'Emit interval (emitInterval)',
                   _emitInterval,
                   0.01,
                   0.5,
@@ -358,9 +361,20 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                 ),
 
                 const Divider(height: 32),
-                _buildSectionTitle('📦 零开销对象池与物理二级缓存上限'),
+                _buildSectionTitle('🚀 Dispatch strategy'),
                 _buildSwitchSetting(
-                  '弹幕位图化渲染 (rasterizeItems · 低端设备/TV 强烈建议开启)',
+                  'Realtime mode (realtimeMode · dispatch on arrival, no pacing)',
+                  _realtimeMode,
+                  (v) => setState(() {
+                    _realtimeMode = v;
+                    _pushLiveUpdate();
+                  }),
+                ),
+
+                const Divider(height: 32),
+                _buildSectionTitle('📦 Object pool & cache budgets'),
+                _buildSwitchSetting(
+                  'Rasterize bitmaps (rasterizeItems · recommended on TV/low-end)',
                   _rasterizeItems,
                   (v) => setState(() {
                     _rasterizeItems = v;
@@ -368,7 +382,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  'BarrageComponent 对象池上限',
+                  'Entry pool size (barragePoolMaxSize)',
                   _barragePoolMaxSize.toDouble(),
                   50,
                   500,
@@ -379,7 +393,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  '弹幕位图缓存条数上限 (pictureCacheMaxSize)',
+                  'Bitmap cache entries (pictureCacheMaxSize)',
                   _pictureCacheMaxSize.toDouble(),
                   50,
                   1500,
@@ -390,7 +404,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  'Paragraph 文本渲染缓存上限',
+                  'Paragraph cache size (textCacheMaxSize)',
                   _textCacheMaxSize.toDouble(),
                   100,
                   3000,
@@ -402,9 +416,9 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                 ),
 
                 const Divider(height: 32),
-                _buildSectionTitle('🛡️ 防追尾安全策略'),
+                _buildSectionTitle('🛡️ Anti-overlap policy'),
                 _buildSliderSetting(
-                  '防重叠绝对安全间距 (overlapSafeGap)',
+                  'Safe gap (overlapSafeGap)',
                   _overlapSafeGap,
                   0.0,
                   150.0,
@@ -416,9 +430,9 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                 ),
 
                 const Divider(height: 32),
-                _buildSectionTitle('🚫 视口黑名单智能过滤'),
+                _buildSectionTitle('🚫 Visibility filters'),
                 _buildSwitchSetting(
-                  '智能隐藏顶部固定弹幕',
+                  'Hide top-pinned barrages',
                   _hideTop,
                   (v) => setState(() {
                     _hideTop = v;
@@ -426,7 +440,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSwitchSetting(
-                  '智能隐藏底部固定弹幕',
+                  'Hide bottom-pinned barrages',
                   _hideBottom,
                   (v) => setState(() {
                     _hideBottom = v;
@@ -434,7 +448,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSwitchSetting(
-                  '智能隐藏普通滚动弹幕',
+                  'Hide scrolling barrages',
                   _hideScroll,
                   (v) => setState(() {
                     _hideScroll = v;
@@ -442,7 +456,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSwitchSetting(
-                  '自动适配安全区域 (safeArea)',
+                  'Respect safe area (safeArea)',
                   _safeArea,
                   (v) => setState(() {
                     _safeArea = v;
@@ -450,7 +464,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSwitchSetting(
-                  '开启纯文本无Emoji模式 (noEmojiMode)',
+                  'Plain text only (noEmojiMode)',
                   _noEmojiMode,
                   (v) => setState(() {
                     _noEmojiMode = v;
@@ -515,7 +529,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
     final weights = [FontWeight.w300, FontWeight.w400, FontWeight.w500, FontWeight.w700];
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      title: const Text('字体字重 (fontWeight)', style: TextStyle(fontSize: 13)),
+      title: const Text('Font weight (fontWeight)', style: TextStyle(fontSize: 13)),
       trailing: DropdownButton<FontWeight>(
         value: _fontWeight,
         dropdownColor: const Color(0xFF1F1F1F),
@@ -564,7 +578,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('选择颜色'),
+          title: const Text('Pick a color'),
           content: SingleChildScrollView(
             child: ColorPickerGrid(
               selectedColor: selectedColor,
@@ -574,13 +588,13 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
             TextButton(
               onPressed: () {
                 onColorChanged(selectedColor);
                 Navigator.of(context).pop();
               },
-              child: const Text('确定'),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -611,7 +625,7 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
   }
 }
 
-// 简单的颜色选择器网格组件
+// Minimal grid-based color picker
 class ColorPickerGrid extends StatelessWidget {
   final Color selectedColor;
   final Function(Color) onColorSelected;

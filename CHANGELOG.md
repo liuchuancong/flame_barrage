@@ -4,32 +4,47 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
+## 0.0.8
+
+### Fixed - motion smoothness on high-fps displays
+
+- **Frame driver rebuilt on Flame's own game loop.** The previous custom pulse ticker + phase accumulator clamped frame durations at three separate layers (ticker delta, step time, engine `dt`) and quantized the motion clock to whole milliseconds. Whenever the actual frame time exceeded a clamp bound (video decode load, 59.94 Hz panels, `fps` set above the display refresh rate), each step advanced less real time than actually elapsed - scroll speed visibly sagged and jumped. The engine now runs on Flame's display-synced loop with microsecond-precision dt, and every logic step advances the clock by the **real** elapsed time; only post-suspend gaps (>150 ms) are clamped. Velocity is uniform by construction.
+- **Microsecond motion clock.** `EngineClock.nowPrecise()` and a double-precision `BarrageEntry.lastUpdateTime` remove the +-0.5 ms integer rounding that jittered per-frame position deltas at high step rates.
+- **Realtime (unthrottled) dispatch.** New `BarrageConfig.realtimeMode`: bypasses the `emitInterval` pacing and drains the whole waiting queue every logic frame (still bounded by `maxVisibleCount` and lane availability), so burst messages appear the moment they arrive instead of trailing the queue. Exposed in the example config panel.
+- **Live config restyling.** `updateConfig` now detects style-affecting changes (font, colors, stroke, shadow, opacity, emoji size, rasterization, interceptors) and lane-geometry changes (track height/area/safe area) and rebuilds every on-screen message immediately via `BarrageDataSystem.relayoutActive` - scrolling items keep their x, pinned items re-center under the new geometry, and pooled artifacts are exchanged by reference count. Speed/buffer-only changes still leave on-screen items untouched.
+
+### Architecture - system-based engine refactor
+
+- **Systems instead of a god class.** The ~900-line `BarrageEngine` was split into four Flame system components that run in a fixed priority order each frame, following a data -> motion -> metrics -> render pipeline:
+  - `BarrageDataSystem` (priority 100) - waiting queue, emit pacing, a staged prepare-ahead pipeline (pending -> prepared -> active, warms parse/layout for up to 3 queue-head messages per frame instead of only the head) and lane allocation on dispatch.
+  - `BarrageMotionSystem` (priority 200) - scroll motion and fixed-item expiry with **immediate swap-remove recycling**: expired entries leave the list the same frame and return to the pool, replacing the old 0.5 s periodic sweep that let dead entries linger (and be traversed by render/hit-testing).
+  - `BarrageMetricsSystem` (priority 300) - per-lane density/avg-speed/youngest-edge aggregation (~30 Hz).
+  - `BarrageRenderSystem` (priority 400) - the flat bitmap blit / vector fallback plus `entryAt` hit-testing.
+  All shared state (config, engine clock, tracks, pools, caches, the live entry list) now lives in a single `BarrageContext`; the engine host keeps only assembly, frame driving and app lifecycle.
+- **Typed engine API.** Added abstract `BarrageEngineApi`; `BarrageEngine implements BarrageEngineApi` and `BarrageController` now forwards calls through the typed interface. The old `dynamic`-based callback indirection (and its try/catch guards) is gone; the public controller methods are unchanged.
+- **Playback rate.** New `BarrageEngine.playbackRate` (getter/setter) scaling the engine clock. Affects scroll speed and fixed-item dwell time together.
+- **Overload watchdog.** Every logic frame is timed; when a step exceeds 20 ms a throttled warning is logged, and `BarrageEngine.lastStepCostUs` / `peakStepCostUs` expose the cost to metrics surfaces.
+- **Removed dead code.** `BarrageComponent`, `BarrageLayer`, `BarrageOverlay` and `OverlapDetector` were unreachable (the engine has rendered from a flat entry list since 0.0.5) and are now deleted together with their exports.
+
+### Breaking changes
+
+- `BarrageEntry.lastUpdateTime` changed from `int` to `double` (sub-millisecond motion precision).
+- `BarrageComponent`, `BarrageLayer`, `BarrageOverlay` and `OverlapDetector` were removed from the public exports.
+
 ## 0.0.7
 
-### Performance — TV / low-end device rendering (弹幕位图化渲染)
+### Performance - TV / low-end device rendering (rasterized barrage bitmaps)
 
-- **Barrage bitmaps.** Each message is now baked once into a GPU-resident bitmap at device resolution (`BarrageConfig.rasterizeItems`, default `true`) and drawn as a single textured quad per frame, instead of replaying its text, stroke, shadow and emoji display list on every display frame. Stroked glyph runs were being re-tessellated by the raster thread on every one of those replays, which is what made a full screen of danmaku drop frames on TV-class hardware. Measured on a 1080p scene with ~74 messages on screen (Windows/Impeller): raster time per frame p50 **1.99 ms → 0.82 ms**, p90 **2.19 ms → 1.04 ms**, at a cost of 8.3 MB of bitmap memory.
+- **Barrage bitmaps.** Each message is now baked once into a GPU-resident bitmap at device resolution (`BarrageConfig.rasterizeItems`, default `true`) and drawn as a single textured quad per frame, instead of replaying its text, stroke, shadow and emoji display list on every display frame. Stroked glyph runs were being re-tessellated by the raster thread on every one of those replays, which made a full screen of danmaku drop frames on TV-class hardware. Measured on a 1080p scene with ~74 messages on screen (Windows/Impeller): raster time per frame p50 **1.99 ms -> 0.82 ms**, p90 **2.19 ms -> 1.04 ms**, at a cost of 8.3 MB of bitmap memory.
 - Added `BarrageConfig.rasterizeItems` and `BarrageConfig.rasterCacheMaxBytes` (default 24 MB) for bitmap baking and its GPU memory budget.
 - Only messages up to 4096 device pixels per side are baked; longer messages and platforms without picture rasterization fall back to the vector path automatically.
 - **Fixed a latent crash/stutter source.** LRU eviction used to dispose pictures that visible messages were still drawing, so a stream with more distinct messages than the cache holds threw on every following frame. The new `RenderCache` is reference counted: an evicted artifact survives until the last barrage using it is recycled, and `clear()` / `updateConfig()` follow the same rule.
 - Added `RenderCache` / `CachedRender` (exported). `PictureCache` is kept for compatibility but is no longer used by the engine.
 - Added `BarrageEngine.activeCount` / `rasterCacheBytes` and `BarrageController.activeItemCount` / `rasterCacheBytes` to observe on-screen load and bitmap memory.
 
-#### 中文说明
-
-- **弹幕位图化。** 每条弹幕只按设备像素比烘焙一次成常驻显存的位图，每个显示帧只画一个纹理四边形，而不再逐帧重放它的文字、描边、阴影与 Emoji 绘制指令；描边字形在每次重放时都被光栅线程重新细分，这正是 TV 上满屏弹幕掉帧的根因。1080p、同屏约 74 条实测：每帧光栅耗时 p50 **1.99 ms → 0.82 ms**、p90 **2.19 ms → 1.04 ms**，位图显存占用 8.3 MB。
-- 新增 `rasterizeItems`（默认开启）与 `rasterCacheMaxBytes`（默认 24 MB）；超长弹幕与不支持位图光栅化的平台自动回退矢量路径。
-- **修复潜在崩溃源。** 原先 LRU 淘汰会直接 dispose 仍被在屏弹幕引用的 Picture；新的 `RenderCache` 采用引用计数，被淘汰的资源会存活到最后一个引用它的弹幕被回收。
-
 ### Example
 
 - Config panel: new `rasterizeItems` switch; memory screen reports bitmap VRAM usage and the on-screen message count.
-- 配置面板新增 `rasterizeItems` 开关；显存监控页新增位图显存占用与同屏弹幕数。
-
-### Tests
-
-- `test/render_cache_test.dart` — eviction / reference counting / byte budget semantics.
-- `test/barrage_raster_test.dart` — the bitmap path lands within 2 px of the vector path with a comparable pixel count, repeated content shares one bitmap, high-density baking, bitmap survival while its cache entry is evicted, and a safe mid-flight fallback.
 
 ## 0.0.6
 - Cleaned up formatting and removed unnecessary whitespace in object_pool.dart, picture_pool.dart, emoji_protocol.dart, message_protocol.dart, barrage_renderer.dart, emoji_renderer.dart, mixed_renderer.dart, base_renderer.dart, overlap_detector.dart, speed_strategy.dart, track_allocator.dart, track_manager.dart, barrage_logger.dart, color_util.dart, fps_monitor.dart, measure.dart, barrage_overlay.dart, and flame_barrage_widget.dart.

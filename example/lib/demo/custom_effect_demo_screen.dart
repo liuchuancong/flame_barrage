@@ -27,7 +27,7 @@ class _CustomEffectDemoScreenState extends State<CustomEffectDemoScreen> {
   }
 
   void _quickSendVip() {
-    _controller.send(const BarrageItem(content: '[VIP] 恭喜帝王尊贵超级VIP进入直播间！👑🔥', type: BarrageType.scroll));
+    _controller.send(const BarrageItem(content: '[VIP] The super VIP has entered the room! 👑🔥', type: BarrageType.scroll));
   }
 
   @override
@@ -40,7 +40,7 @@ class _CustomEffectDemoScreenState extends State<CustomEffectDemoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('外部插件化自定义特效演示')),
+      appBar: AppBar(title: const Text('Pluggable Custom Effect Demo')),
       body: Column(
         children: [
           Expanded(
@@ -61,14 +61,14 @@ class _CustomEffectDemoScreenState extends State<CustomEffectDemoScreen> {
                         child: TextField(
                           controller: _textController,
                           decoration: const InputDecoration(
-                            hintText: '输入普通文字，或包含 [VIP] 触发自定义特效...',
+                            hintText: 'Type plain text, or include [VIP] to trigger the custom effect...',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      ElevatedButton(onPressed: _sendBarrage, child: const Text('发射')),
+                      ElevatedButton(onPressed: _sendBarrage, child: const Text('Send')),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -79,7 +79,7 @@ class _CustomEffectDemoScreenState extends State<CustomEffectDemoScreen> {
                     ),
                     onPressed: _quickSendVip,
                     icon: const Icon(Icons.workspace_premium, color: Colors.amber),
-                    label: const Text('一键测试 [VIP] 自定义特效拦截', style: TextStyle(color: Colors.white)),
+                    label: const Text('Test the [VIP] interceptor', style: TextStyle(color: Colors.white)),
                   ),
                 ],
               ),

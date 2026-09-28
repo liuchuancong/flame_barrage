@@ -29,7 +29,7 @@ class _FlameBarrageWidgetState extends State<FlameBarrageWidget> {
   void initState() {
     super.initState();
     _engine = BarrageEngine(config: widget.config, emojiAtlas: widget.emojiAtlas);
-    _initControllerCallbacks();
+    widget.controller.attach(_engine);
   }
 
   @override
@@ -40,42 +40,8 @@ class _FlameBarrageWidgetState extends State<FlameBarrageWidget> {
     }
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.detach(_engine);
-      _initControllerCallbacks();
+      widget.controller.attach(_engine);
     }
-  }
-
-  void _initControllerCallbacks() {
-    widget.controller.attach(_engine);
-
-    widget.controller.onAddDanmaku = (item) {
-      if (mounted) {
-        _engine.pushMessage(item);
-      }
-    };
-
-    widget.controller.onUpdateOption = (newConfig) {
-      if (mounted) {
-        _engine.updateConfig(newConfig);
-      }
-    };
-
-    widget.controller.onPause = () {
-      if (mounted) {
-        _engine.pause();
-      }
-    };
-
-    widget.controller.onResume = () {
-      if (mounted) {
-        _engine.resume();
-      }
-    };
-
-    widget.controller.onClear = () {
-      if (mounted) {
-        _engine.clear();
-      }
-    };
   }
 
   @override

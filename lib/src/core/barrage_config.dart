@@ -30,6 +30,7 @@ class BarrageConfig {
     this.maxPendingCount = 120,
     this.maxPendingAge = const Duration(seconds: 5),
     this.emitInterval = 0.1,
+    this.realtimeMode = false,
     this.baseSpeed = 120.0,
     this.strokeWidth = 1.0,
     this.overlapSafeGap = 40.0,
@@ -111,6 +112,13 @@ class BarrageConfig {
   /// The dispatch clock ticking time interval during normal concurrency traffic pumping.
   final double emitInterval;
 
+  /// Unthrottled dispatch. When true, the emit-interval pacing driven by
+  /// [emitInterval] is bypassed and the waiting queue is flushed to the screen
+  /// on every logic frame, subject to [maxVisibleCount] and lane availability.
+  /// Messages produced in bursts appear the moment they arrive instead of
+  /// trailing the queue; the trade-off is a denser screen during those bursts.
+  final bool realtimeMode;
+
   /// The internal pixel-per-second velocity reference mapping baseline tracking constraint.
   final double baseSpeed;
 
@@ -184,6 +192,7 @@ class BarrageConfig {
     int? maxPendingCount,
     Duration? maxPendingAge,
     double? emitInterval,
+    bool? realtimeMode,
     double? baseSpeed,
     double? overlapSafeGap,
     bool? noEmojiMode,
@@ -221,6 +230,7 @@ class BarrageConfig {
       maxPendingCount: maxPendingCount ?? this.maxPendingCount,
       maxPendingAge: maxPendingAge ?? this.maxPendingAge,
       emitInterval: emitInterval ?? this.emitInterval,
+      realtimeMode: realtimeMode ?? this.realtimeMode,
       baseSpeed: baseSpeed ?? this.baseSpeed,
       overlapSafeGap: overlapSafeGap ?? this.overlapSafeGap,
       noEmojiMode: noEmojiMode ?? this.noEmojiMode,
@@ -263,6 +273,7 @@ class BarrageConfig {
         other.maxPendingCount == maxPendingCount &&
         other.maxPendingAge == maxPendingAge &&
         other.emitInterval == emitInterval &&
+        other.realtimeMode == realtimeMode &&
         other.baseSpeed == baseSpeed &&
         other.overlapSafeGap == overlapSafeGap &&
         other.noEmojiMode == noEmojiMode &&
@@ -302,6 +313,7 @@ class BarrageConfig {
       maxPendingCount,
       maxPendingAge,
       emitInterval,
+      realtimeMode,
       baseSpeed,
       overlapSafeGap,
       noEmojiMode,

@@ -58,14 +58,14 @@ class _SpriteSheetDemoScreenState extends State<SpriteSheetDemoScreen> {
         });
       }
     } catch (e, stack) {
-      BarrageLogger.e('SpriteSheetDemo', 'CSS雪碧图解析分配失败', e, stack);
+      BarrageLogger.e('SpriteSheetDemo', 'Failed to slice the CSS sprite sheet', e, stack);
     }
   }
 
   void _sendMixedBarrage() {
     if (!_isAtlasReady) return;
     _controller.send(
-      const BarrageItem(content: 'CSS雪碧图大满贯：[表面呲牙][表面微笑] 现场直刷！[闭嘴][不看][不理不想][不是吧][不信谣言][擦汗]', type: BarrageType.scroll),
+      const BarrageItem(content: 'CSS sprite sheet showcase: [表面呲牙][表面微笑] live render! [闭嘴][不看][不理不想][不是吧][不信谣言][擦汗]', type: BarrageType.scroll),
     );
   }
 
@@ -85,7 +85,7 @@ class _SpriteSheetDemoScreenState extends State<SpriteSheetDemoScreen> {
         elevation: 0,
         backgroundColor: const Color(0xFF1F1F1F),
         title: const Text(
-          'CSS 规范大图集自适应裁剪',
+          'CSS sprite sheet adaptive slicing',
           style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -150,7 +150,7 @@ class _SpriteSheetDemoScreenState extends State<SpriteSheetDemoScreen> {
                   onPressed: _isAtlasReady ? _sendMixedBarrage : null,
                   icon: const Icon(Icons.face_retouching_natural_rounded, color: Colors.white, size: 18),
                   label: const Text(
-                    '发射CSS大图集混排弹幕',
+                    'Send mixed sprite-sheet barrage',
                     style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),

@@ -16,15 +16,12 @@ export 'src/cache/render_cache.dart';
 export 'src/cache/sprite_cache.dart';
 export 'src/cache/text_cache.dart';
 
-// components
-export 'src/components/barrage_component.dart';
-
 // core
 export 'src/core/barrage_config.dart';
 export 'src/core/barrage_context.dart';
 export 'src/core/barrage_controller.dart';
 export 'src/core/barrage_engine.dart';
-export 'src/core/barrage_layer.dart';
+export 'src/core/barrage_engine_api.dart';
 
 // effect
 export 'src/effect/glow_effect.dart';
@@ -32,6 +29,18 @@ export 'src/effect/gradient_effect.dart';
 export 'src/effect/shadow_effect.dart';
 export 'src/effect/stroke_effect.dart';
 export 'src/effect/barrage_effect_interceptor.dart';
+
+// effect/motion — effect danmaku (entrance/cruise/exit choreography, hand-drawn mounts, particles)
+export 'src/effect/motion/barrage_fx_particle.dart';
+export 'src/effect/motion/barrage_motion_effect.dart';
+export 'src/effect/motion/airplane_effect.dart';
+export 'src/effect/motion/dragon_swim_effect.dart';
+export 'src/effect/motion/ghost_drift_effect.dart';
+export 'src/effect/motion/horse_riding_effect.dart';
+export 'src/effect/motion/magic_carpet_effect.dart';
+export 'src/effect/motion/meteor_streak_effect.dart';
+export 'src/effect/motion/rocket_launch_effect.dart';
+export 'src/effect/motion/ufo_effect.dart';
 
 // layout
 export 'src/layout/emoji_fragment.dart';
@@ -76,10 +85,15 @@ export 'src/render/barrage/mixed_renderer.dart';
 export 'src/render/base_renderer.dart';
 
 // scheduler
-export 'src/scheduler/overlap_detector.dart';
 export 'src/scheduler/speed_strategy.dart';
 export 'src/scheduler/track_allocator.dart';
 export 'src/scheduler/track_manager.dart';
+
+// systems
+export 'src/systems/barrage_data_system.dart';
+export 'src/systems/barrage_metrics_system.dart';
+export 'src/systems/barrage_motion_system.dart';
+export 'src/systems/barrage_render_system.dart';
 
 // util
 export 'src/util/barrage_logger.dart';
@@ -88,5 +102,4 @@ export 'src/util/fps_monitor.dart';
 export 'src/util/measure.dart';
 
 // widget
-export 'src/widget/barrage_overlay.dart';
 export 'src/widget/flame_barrage_widget.dart';

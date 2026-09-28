@@ -1,21 +1,37 @@
+import '../model/barrage/barrage_item.dart';
+import 'barrage_config.dart';
+import 'barrage_engine_api.dart';
+
+/// Type-safe facade between host application code and the engine.
+///
+/// Business code talks to [BarrageController] only ([send], [pause],
+/// [resume], [clear], [updateConfig]); every call is forwarded to the
+/// [BarrageEngineApi] implementation currently attached. The interface makes
+/// the forwarding statically checked, so a signature drift between the two
+/// sides fails analysis instead of surfacing as a runtime cast error.
 class BarrageController {
-  dynamic _engine;
-  void Function(dynamic)? _onAddDanmaku;
-  void Function(dynamic)? _onUpdateOption;
-  void Function()? _onPause;
-  void Function()? _onResume;
-  void Function()? _onClear;
+  BarrageEngineApi? _engine;
 
   bool running = true;
   int _totalEmittedCount = 0;
 
-  dynamic get engine => _engine;
+  BarrageEngineApi? get engine => _engine;
 
-  set onAddDanmaku(void Function(dynamic) callback) => _onAddDanmaku = callback;
-  set onUpdateOption(void Function(dynamic) callback) => _onUpdateOption = callback;
-  set onPause(void Function() callback) => _onPause = callback;
-  set onResume(void Function() callback) => _onResume = callback;
-  set onClear(void Function() callback) => _onClear = callback;
+  void attach(BarrageEngineApi engine) => _engine = engine;
+
+  void detach([BarrageEngineApi? engine]) {
+    if (engine != null && !identical(_engine, engine)) return;
+    _engine = null;
+  }
+
+  void send(BarrageItem item) {
+    if (!running) return;
+    _totalEmittedCount++;
+    _engine?.pushMessage(item);
+  }
+
+  void updateConfig(BarrageConfig newConfig) => _engine?.updateConfig(newConfig);
+
   void togglePause() {
     if (running) {
       pause();
@@ -24,105 +40,33 @@ class BarrageController {
     }
   }
 
-  void attach(dynamic engine) {
-    _engine = engine;
-  }
-
-  void detach([dynamic engine]) {
-    if (engine != null && !identical(_engine, engine)) return;
-    _engine = null;
-    _onAddDanmaku = null;
-    _onUpdateOption = null;
-    _onPause = null;
-    _onResume = null;
-    _onClear = null;
-  }
-
-  void send(dynamic item) {
-    if (!running) return;
-    _totalEmittedCount++;
-    _onAddDanmaku?.call(item);
-  }
-
-  void updateConfig(dynamic newConfig) {
-    _onUpdateOption?.call(newConfig);
-  }
-
   void pause() {
     running = false;
-    _onPause?.call();
+    _engine?.pause();
   }
 
   void resume() {
     running = true;
-    _onResume?.call();
+    _engine?.resume();
   }
 
-  void clear() {
-    _onClear?.call();
-  }
+  void clear() => _engine?.clear();
 
   bool triggerItemAt(double x, double y, {required bool longPress}) {
-    final currentEngine = _engine;
-    if (currentEngine == null) return false;
-    try {
-      return currentEngine.triggerItemAt(x, y, longPress: longPress) as bool;
-    } catch (_) {
-      return false;
-    }
+    return _engine?.triggerItemAt(x, y, longPress: longPress) ?? false;
   }
 
   int get totalEmitted => _totalEmittedCount;
 
-  int get pictureCacheCount {
-    final currentEngine = _engine;
-    if (currentEngine != null) {
-      try {
-        return currentEngine.activeCacheSize as int;
-      } catch (_) {}
-    }
-    return 0;
-  }
+  int get pictureCacheCount => _engine?.activeCacheSize ?? 0;
 
-  int get poolObjectCount {
-    final currentEngine = _engine;
-    if (currentEngine != null) {
-      try {
-        return currentEngine.activePoolSize as int;
-      } catch (_) {}
-    }
-    return 0;
-  }
+  int get poolObjectCount => _engine?.activePoolSize ?? 0;
 
-  int get pendingMessageCount {
-    final currentEngine = _engine;
-    if (currentEngine != null) {
-      try {
-        return currentEngine.pendingMessageCount as int;
-      } catch (_) {}
-    }
-    return 0;
-  }
+  int get pendingMessageCount => _engine?.pendingMessageCount ?? 0;
 
   /// Messages currently on screen, which is what a frame actually pays for.
-  int get activeItemCount {
-    final currentEngine = _engine;
-    if (currentEngine != null) {
-      try {
-        return currentEngine.activeCount as int;
-      } catch (_) {}
-    }
-    return 0;
-  }
+  int get activeItemCount => _engine?.activeCount ?? 0;
 
   /// GPU memory held by the rasterized message bitmaps, in bytes.
-  int get rasterCacheBytes {
-    final currentEngine = _engine;
-    if (currentEngine != null) {
-      try {
-        return currentEngine.rasterCacheBytes as int;
-      } catch (_) {}
-    }
-    return 0;
-  }
+  int get rasterCacheBytes => _engine?.rasterCacheBytes ?? 0;
 }

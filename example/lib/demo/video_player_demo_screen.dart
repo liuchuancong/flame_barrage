@@ -38,24 +38,24 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
   void _injectStressTestBarrages() {
     final items = [
       BarrageItem(
-        content: '⚡ 点击按下测试弹幕 ⚡',
+        content: '⚡ Tap-down target ⚡',
         type: BarrageType.scroll,
         priority: 1,
-        onTapDown: () => _logGestureEvent('【onTapDown】击中目标文字！'),
-        onTapUp: () => _logGestureEvent('【onTapUp】鼠标顺利抬起释放'),
-        onLongTapDown: () => _logGestureEvent('【onLongTapDown】触发高能长按！'),
-        onTapCancel: () => _logGestureEvent('【onTapCancel】触控判定移出被取消'),
+        onTapDown: () => _logGestureEvent('[onTapDown] hit the target text!'),
+        onTapUp: () => _logGestureEvent('[onTapUp] pointer released'),
+        onLongTapDown: () => _logGestureEvent('[onLongTapDown] long press fired!'),
+        onTapCancel: () => _logGestureEvent('[onTapCancel] gesture cancelled'),
       ),
       BarrageItem(
-        content: '🔥 连续多手势联合并发轰炸 🔥',
+        content: '🔥 Concurrent multi-gesture stress 🔥',
         type: BarrageType.scroll,
         priority: 1,
-        onTapDown: () => _logGestureEvent('【onTapDown】高并发触发'),
-        onTapUp: () => _logGestureEvent('【onTapUp】释放总线'),
-        onLongTapDown: () => _logGestureEvent('【onLongTapDown】长按蓄力中...'),
-        onTapCancel: () => _logGestureEvent('【onTapCancel】判定拦截撤销'),
+        onTapDown: () => _logGestureEvent('[onTapDown] high-concurrency hit'),
+        onTapUp: () => _logGestureEvent('[onTapUp] released'),
+        onLongTapDown: () => _logGestureEvent('[onLongTapDown] long press charging...'),
+        onTapCancel: () => _logGestureEvent('[onTapCancel] cancelled'),
       ),
-      const BarrageItem(content: '背景杂音普通不响应点击弹幕 666', type: BarrageType.scroll, priority: 0),
+      const BarrageItem(content: 'Background noise barrage, no tap handler 666', type: BarrageType.scroll, priority: 0),
     ];
 
     for (int i = 0; i < 4; i++) {
@@ -73,7 +73,7 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         title: const Text(
-          '4大底层手势流联合压测',
+          'Four-way gesture stream stress test',
           style: TextStyle(color: Color(0xFF1F2328), fontWeight: FontWeight.bold, fontSize: 17),
         ),
         centerTitle: true,
@@ -172,7 +172,7 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
                 onPressed: _injectStressTestBarrages,
                 icon: const Icon(Icons.bolt, color: Colors.white, size: 18),
                 label: const Text(
-                  '注入4重手势高频测试弹幕',
+                  'Inject four gesture-heavy test barrages',
                   style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -199,14 +199,14 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
                           Icon(Icons.terminal_rounded, color: Colors.greenAccent, size: 16),
                           SizedBox(width: 6),
                           Text(
-                            '手势总线实时捕获控制台',
+                            'Gesture event capture console',
                             style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
                       TextButton(
                         onPressed: () => setState(() => _gestureConsoleLogs.clear()),
-                        child: const Text('清空日志', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                        child: const Text('Clear log', style: TextStyle(color: Colors.grey, fontSize: 11)),
                       ),
                     ],
                   ),
@@ -215,7 +215,7 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
                     child: _gestureConsoleLogs.isEmpty
                         ? const Center(
                             child: Text(
-                              '暂无手势触发，请用鼠标点击或长按上方滑出的【⚡】或【🔥】弹幕文字',
+                              'No gestures yet. Click or long-press the ⚡ or 🔥 barrages scrolling above.',
                               style: TextStyle(color: Colors.white30, fontSize: 11),
                               textAlign: TextAlign.center,
                             ),

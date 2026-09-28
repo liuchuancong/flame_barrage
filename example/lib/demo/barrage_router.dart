@@ -4,6 +4,7 @@ import 'asset_loading_screen.dart';
 import 'live_room_demo_screen.dart';
 import 'memory_profile_screen.dart';
 import 'effects_preview_screen.dart';
+import 'mount_parade_demo_screen.dart';
 import 'performance_demo_screen.dart';
 import 'package:flutter/material.dart';
 import 'video_player_demo_screen.dart';
@@ -29,6 +30,7 @@ class BarrageRouter {
       '/custom_effect': (context) => const CustomEffectDemoScreen(),
       '/memory': (context) => const MemoryProfileScreen(),
       '/effects_preview': (context) => const EffectsPreviewScreen(),
+      '/mount_parade': (context) => const MountParadeDemoScreen(),
       '/config_panel': (context) => BarrageConfigPanelScreen(
         initialConfig: globalConfig,
         onConfigChanged: (newConfig) {

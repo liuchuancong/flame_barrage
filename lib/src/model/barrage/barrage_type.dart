@@ -1,11 +1,11 @@
-/// 弹幕布局类型
+/// How a message behaves once it reaches the screen.
 enum BarrageType {
-  /// 普通滚动弹幕
+  /// Enters from the right edge and scrolls left until it leaves the screen.
   scroll,
 
-  /// 顶部固定弹幕
+  /// Pinned to a lane at the top for [BarrageConfig.fixedDuration].
   topFixed,
 
-  /// 底部固定弹幕
+  /// Pinned to a lane at the bottom for [BarrageConfig.fixedDuration].
   bottomFixed,
 }

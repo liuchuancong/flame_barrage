@@ -33,7 +33,7 @@ class _EffectsPreviewScreenState extends State<EffectsPreviewScreen> {
 
   void _sendEffectBarrage(String effectTag) {
     final String content = _textController.text.trim().isEmpty
-        ? '尊贵VIP发送了 [$effectTag] 特效弹幕！🚀'
+        ? 'A VIP sent a [$effectTag] effect barrage! 🚀'
         : _textController.text.trim();
 
     _controller.send(BarrageItem(content: '$effectTag::$content', type: BarrageType.scroll, priority: 1));
@@ -50,7 +50,7 @@ class _EffectsPreviewScreenState extends State<EffectsPreviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('高级视觉特效全景预览')),
+      appBar: AppBar(title: const Text('Visual Effects Gallery')),
       body: Column(
         children: [
           Expanded(
@@ -71,14 +71,14 @@ class _EffectsPreviewScreenState extends State<EffectsPreviewScreen> {
                         child: TextField(
                           controller: _textController,
                           decoration: const InputDecoration(
-                            hintText: '输入自定义文本，选择下方特效发射...',
+                            hintText: 'Type custom text, pick an effect below...',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      ElevatedButton(onPressed: _sendNormalBarrage, child: const Text('普通')),
+                      ElevatedButton(onPressed: _sendNormalBarrage, child: const Text('Plain')),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -89,21 +89,21 @@ class _EffectsPreviewScreenState extends State<EffectsPreviewScreen> {
                     children: [
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey),
-                        onPressed: () => _sendEffectBarrage('外描边'),
+                        onPressed: () => _sendEffectBarrage('Outline'),
                         icon: const Icon(Icons.border_color, size: 16),
-                        label: const Text('外描边'),
+                        label: const Text('Outline'),
                       ),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-                        onPressed: () => _sendEffectBarrage('立体阴影'),
+                        onPressed: () => _sendEffectBarrage('Shadow'),
                         icon: const Icon(Icons.layers, size: 16),
-                        label: const Text('立体阴影'),
+                        label: const Text('Shadow'),
                       ),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
-                        onPressed: () => _sendEffectBarrage('霓虹发光'),
+                        onPressed: () => _sendEffectBarrage('Neon'),
                         icon: const Icon(Icons.lightbulb, size: 16),
-                        label: const Text('霓虹发光'),
+                        label: const Text('Neon'),
                       ),
                       Container(
                         decoration: BoxDecoration(
@@ -116,9 +116,9 @@ class _EffectsPreviewScreenState extends State<EffectsPreviewScreen> {
                             shadowColor: Colors.transparent,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
-                          onPressed: () => _sendEffectBarrage('VIP七彩'),
+                          onPressed: () => _sendEffectBarrage('VIP Rainbow'),
                           icon: const Icon(Icons.stars, size: 16, color: Colors.white),
-                          label: const Text('VIP七彩渐变', style: TextStyle(color: Colors.white)),
+                          label: const Text('VIP Rainbow', style: TextStyle(color: Colors.white)),
                         ),
                       ),
                     ],
@@ -127,7 +127,7 @@ class _EffectsPreviewScreenState extends State<EffectsPreviewScreen> {
                   TextButton.icon(
                     onPressed: () => _controller.clear(),
                     icon: const Icon(Icons.clear_all, size: 16, color: Colors.grey),
-                    label: const Text('清空舞台', style: TextStyle(color: Colors.grey)),
+                    label: const Text('Clear stage', style: TextStyle(color: Colors.grey)),
                   ),
                 ],
               ),
@@ -142,7 +142,7 @@ class _EffectsPreviewScreenState extends State<EffectsPreviewScreen> {
 class StrokeInterceptor extends BarrageEffectInterceptor {
   const StrokeInterceptor();
   @override
-  bool shouldIntercept(BarrageItem item, BarrageConfig config) => item.content.startsWith('外描边::');
+  bool shouldIntercept(BarrageItem item, BarrageConfig config) => item.content.startsWith('Outline::');
   @override
   LayoutSpan createCustomSpan({
     required BarrageItem item,
@@ -159,7 +159,7 @@ class StrokeInterceptor extends BarrageEffectInterceptor {
       y: y,
       width: width,
       height: height,
-      text: text.replaceFirst('外描边::', ''),
+      text: text.replaceFirst('Outline::', ''),
       paragraph: paragraph,
       config: config,
     );
@@ -213,7 +213,7 @@ class PreviewStrokeSpan extends TextLayoutSpan {
 class ShadowInterceptor extends BarrageEffectInterceptor {
   const ShadowInterceptor();
   @override
-  bool shouldIntercept(BarrageItem item, BarrageConfig config) => item.content.startsWith('立体阴影::');
+  bool shouldIntercept(BarrageItem item, BarrageConfig config) => item.content.startsWith('Shadow::');
   @override
   LayoutSpan createCustomSpan({
     required BarrageItem item,
@@ -230,7 +230,7 @@ class ShadowInterceptor extends BarrageEffectInterceptor {
       y: y,
       width: width,
       height: height,
-      text: text.replaceFirst('立体阴影::', ''),
+      text: text.replaceFirst('Shadow::', ''),
       paragraph: paragraph,
       config: config,
     );
@@ -288,7 +288,7 @@ class PreviewShadowSpan extends TextLayoutSpan {
 class GlowInterceptor extends BarrageEffectInterceptor {
   const GlowInterceptor();
   @override
-  bool shouldIntercept(BarrageItem item, BarrageConfig config) => item.content.startsWith('霓虹发光::');
+  bool shouldIntercept(BarrageItem item, BarrageConfig config) => item.content.startsWith('Neon::');
   @override
   LayoutSpan createCustomSpan({
     required BarrageItem item,
@@ -305,7 +305,7 @@ class GlowInterceptor extends BarrageEffectInterceptor {
       y: y,
       width: width,
       height: height,
-      text: text.replaceFirst('霓虹发光::', ''),
+      text: text.replaceFirst('Neon::', ''),
       paragraph: paragraph,
       config: config,
     );
@@ -357,7 +357,7 @@ class PreviewGlowSpan extends TextLayoutSpan {
 class RainbowInterceptor extends BarrageEffectInterceptor {
   const RainbowInterceptor();
   @override
-  bool shouldIntercept(BarrageItem item, BarrageConfig config) => item.content.startsWith('VIP七彩::');
+  bool shouldIntercept(BarrageItem item, BarrageConfig config) => item.content.startsWith('VIP Rainbow::');
   @override
   LayoutSpan createCustomSpan({
     required BarrageItem item,
@@ -374,7 +374,7 @@ class RainbowInterceptor extends BarrageEffectInterceptor {
       y: y,
       width: width,
       height: height,
-      text: text.replaceFirst('VIP七彩::', ''),
+      text: text.replaceFirst('VIP Rainbow::', ''),
       paragraph: paragraph,
       config: config,
     );

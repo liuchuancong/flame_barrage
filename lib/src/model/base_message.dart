@@ -11,24 +11,24 @@ class BarrageMessage {
     this.priority = 0,
   });
 
-  /// 消息唯一ID
+  /// Stable message identifier assigned by the host application.
   final String id;
 
-  /// 弹幕内容
+  /// Raw text displayed on screen.
   final String content;
 
-  /// 消息时间
+  /// Wall-clock time the message was produced at the source.
   final DateTime timestamp;
 
-  /// 弹幕类型
+  /// Placement/scroll behavior of the message.
   final BarrageType type;
 
-  /// 用户ID
+  /// Optional sender identifier, useful for deduplication and moderation.
   final String? userId;
 
-  /// 用户昵称
+  /// Optional display name shown alongside the message.
   final String? userName;
 
-  /// 优先级
+  /// Higher-priority messages win lane allocation when tracks are contested.
   final int priority;
 }
