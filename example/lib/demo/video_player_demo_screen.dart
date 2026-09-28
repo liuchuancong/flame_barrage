@@ -104,6 +104,7 @@ class _VideoPlayerDemoScreenState extends State<VideoPlayerDemoScreen> {
                       config: BarrageRouter.globalConfig.copyWith(area: 0.7),
                       emojiAtlas: EmojiAtlas.instance,
                       controller: _controller,
+                      enablePointerEvents: true,
                     ),
                   ),
                   Positioned(
