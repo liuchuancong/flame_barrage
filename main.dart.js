@@ -8858,11 +8858,12 @@ _.b=null
 _.c=!1
 _.d=b},
 a6e:function a6e(a){this.a=a},
-f5:function f5(a,b,c,d){var _=this
+f5:function f5(a,b,c,d,e){var _=this
 _.c=a
 _.d=b
 _.e=c
-_.a=d},
+_.f=d
+_.a=e},
 Tm:function Tm(){this.d=$
 this.c=this.a=null},
 hJ:function hJ(a,b){this.a=a
@@ -43727,7 +43728,7 @@ s.c.aj(t.Pu).f.N3(B.Yc)},
 l(){this.d.a8()
 this.aB()},
 J(c2){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5=this,b6=null,b7=b5.Eb(),b8=t.p,b9=A.hK(A.b([A.lb(b6,b6,B.N0,b6,b6,b5.gajU(),b6,b6,b6)],b8),b6,b6,b6,b6,B.a3s),c0=A.bz(16),c1=A.mD(B.ch,1)
-c0=A.cf(A.tG(A.bz(16),new A.f5(b7,$.fz(),b5.d,b6),B.bj),B.p,b6,new A.c0(B.l,b6,c1,c0,b6,b6,B.a_),180,B.ck,b6,b6)
+c0=A.cf(A.tG(A.bz(16),new A.f5(b7,$.fz(),b5.d,!1,b6),B.bj),B.p,b6,new A.c0(B.l,b6,c1,c0,b6,b6,B.a_),180,B.ck,b6,b6)
 c1=A.cC(b6,b6,B.bF,b6,b6,b6,b6,b6,b6,B.l,b6,B.BA,b6,b6,new A.bL(A.bz(12),B.m),b6,b6,b6,b6,b6)
 s=b5.r
 c1=A.iQ(B.N_,A.br("Send a verification barrage (fontSize: "+B.d.d4(s)+"px)",b6,b6,b6,b6,b6,b6),new A.alB(b5),c1)
@@ -44122,7 +44123,7 @@ s.a8()
 this.aB()},
 J(a){var s,r,q,p,o,n,m,l,k=this,j=null,i=A.hK(j,j,j,2,A.lb(j,j,B.q5,j,j,new A.am2(a),j,j,j),B.a2L),h=A.cf(j,B.p,B.GT,j,j,j,j,j),g=$.kP,f=$.fz(),e=k.d
 e===$&&A.a()
-f=A.v3(0,new A.f5(g,f,e,j))
+f=A.v3(0,new A.f5(g,f,e,!1,j))
 g=A.bz(12)
 s=A.cW(A.dN(B.a2R,k.ga20(),A.cC(j,j,j,j,j,j,j,j,j,j,j,j,B.bl,j,new A.bL(A.bz(8),B.m),j,j,j,j,j)),j,100)
 r=A.cW(A.dN(B.a3q,k.ga23(),A.cC(j,j,j,j,j,j,j,j,j,j,j,j,B.bl,j,new A.bL(A.bz(8),B.m),j,j,j,j,j)),j,125)
@@ -44311,7 +44312,7 @@ this.aB()},
 J(a){var s,r=this,q=null,p=A.hK(q,q,q,q,q,B.a2S),o=r.f
 o===$&&A.a()
 s=t.p
-return A.hq(p,q,A.dr(A.b([A.e0(A.cf(new A.f5(o,$.fz(),r.d,q),B.p,B.Hp,q,q,q,q,q)),A.fT(!0,new A.bq(B.ck,A.dr(A.b([A.dR(A.b([A.e0(A.aiA(r.e,B.Nk,q)),B.b0,A.dN(B.Ca,r.gakt(),q)],s),B.C,B.F,B.Q,0),B.fT,A.iQ(B.MQ,B.a3n,r.gaj3(),A.cC(q,q,B.wK,q,q,q,q,q,q,q,q,B.XQ,q,q,q,q,q,q,q,q))],s),B.C,B.F,B.by),q),B.M,!0)],s),B.C,B.F,B.Q))}}
+return A.hq(p,q,A.dr(A.b([A.e0(A.cf(new A.f5(o,$.fz(),r.d,!1,q),B.p,B.Hp,q,q,q,q,q)),A.fT(!0,new A.bq(B.ck,A.dr(A.b([A.dR(A.b([A.e0(A.aiA(r.e,B.Nk,q)),B.b0,A.dN(B.Ca,r.gakt(),q)],s),B.C,B.F,B.Q,0),B.fT,A.iQ(B.MQ,B.a3n,r.gaj3(),A.cC(q,q,B.wK,q,q,q,q,q,q,q,q,B.XQ,q,q,q,q,q,q,q,q))],s),B.C,B.F,B.by),q),B.M,!0)],s),B.C,B.F,B.Q))}}
 A.QN.prototype={
 tp(a,b){return B.e.t(a.a,"[VIP]")},
 vc(a,b,c,d,e,f,g,h){return A.aGm(a,b,d,e,f,g,h)}}
@@ -44368,7 +44369,7 @@ this.d.a8()
 this.aB()},
 J(a){var s,r,q,p,o,n,m=this,l=null,k=A.hK(l,l,l,l,l,B.a2G),j=m.f
 j===$&&A.a()
-j=A.e0(A.cf(new A.f5(j,$.fz(),m.d,l),B.p,B.l,l,l,l,l,l))
+j=A.e0(A.cf(new A.f5(j,$.fz(),m.d,!1,l),B.p,B.l,l,l,l,l,l))
 s=t.p
 r=A.dR(A.b([A.e0(A.aiA(m.e,B.Nj,l)),B.b0,A.dN(B.a37,m.gakx(),l)],s),B.C,B.F,B.Q,0)
 q=A.iQ(B.MB,B.a3o,new A.aoq(m),A.cC(l,l,B.lQ,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l))
@@ -44553,7 +44554,7 @@ r.I$=0
 s.d.a8()
 s.aB()},
 J(a){var s,r,q,p,o,n,m=this,l=null,k=A.hK(l,l,l,l,l,B.a2O),j=A.cf(l,B.p,B.l,l,l,l,l,l),i=t.p
-j=A.e0(A.fW(B.bs,A.b([j,A.v3(0,m.x?new A.f5($.kP,$.fz(),m.d,l):B.FT)],i),B.O,B.bd,l))
+j=A.e0(A.fW(B.bs,A.b([j,A.v3(0,m.x?new A.f5($.kP,$.fz(),m.d,!1,l):B.FT)],i),B.O,B.bd,l))
 s=A.L(a)
 r=A.ahi(A.dR(A.b([A.ayt(B.MT,B.a3_,new A.amb(m)),B.b0,A.ayt(B.MN,B.a2Y,new A.amc(m)),B.b0,A.ayt(B.MS,B.a36,new A.amd(m))],i),B.C,B.F,B.Q,0),B.ak)
 q=A.dR(A.b([A.e0(A.aiA(m.f,B.Nl,l)),B.b0,A.dN(B.Ca,new A.ame(m),l)],i),B.C,B.F,B.Q,0)
@@ -44622,7 +44623,7 @@ if(s!=null)s.aL()
 s=this.d
 if(s!=null)s.aL()
 this.aB()},
-J(a){var s=this,r=null,q=$.kP,p=A.hK(r,r,r,r,r,B.a3a),o=t.p,n=A.cf(A.dr(A.b([s.xA("Total dispatched",""+s.r,B.cG),B.fU,s.xA("Bitmap render cache (LRU)",""+s.w+" / "+q.k3,B.dZ),B.fU,s.xA("Bitmap VRAM / on-screen count",B.d.ab(s.z/1048576,1)+" MB / "+s.y,B.wG),B.fU,s.xA("BarragePool pooled entries",""+s.x+" / "+q.k2,B.dc)],o),B.C,B.F,B.Q),B.p,B.oU,r,r,r,B.cl,r),m=A.e0(A.cf(new A.f5(q,$.fz(),$.a_C(),r),B.p,B.l,r,r,r,r,r)),l=A.cC(r,r,s.f?B.fz:B.lP,r,r,r,r,r,r,r,r,B.BA,r,r,r,r,r,r,r,r),k=s.f,j=A.Ae(k?B.Ma:B.Mb,r,r,r)
+J(a){var s=this,r=null,q=$.kP,p=A.hK(r,r,r,r,r,B.a3a),o=t.p,n=A.cf(A.dr(A.b([s.xA("Total dispatched",""+s.r,B.cG),B.fU,s.xA("Bitmap render cache (LRU)",""+s.w+" / "+q.k3,B.dZ),B.fU,s.xA("Bitmap VRAM / on-screen count",B.d.ab(s.z/1048576,1)+" MB / "+s.y,B.wG),B.fU,s.xA("BarragePool pooled entries",""+s.x+" / "+q.k2,B.dc)],o),B.C,B.F,B.Q),B.p,B.oU,r,r,r,B.cl,r),m=A.e0(A.cf(new A.f5(q,$.fz(),$.a_C(),!1,r),B.p,B.l,r,r,r,r,r)),l=A.cC(r,r,s.f?B.fz:B.lP,r,r,r,r,r,r,r,r,B.BA,r,r,r,r,r,r,r,r),k=s.f,j=A.Ae(k?B.Ma:B.Mb,r,r,r)
 return A.hq(p,r,A.dr(A.b([n,m,A.fT(!0,new A.bq(B.ck,A.dR(A.b([A.e0(A.iQ(j,A.br(k?"Pause 300 msg/s flood":"Start 300 msg/s flood",r,r,r,r,r,r),s.gamc(),l)),B.BD,A.dN(B.a2N,s.gab8(),A.cC(r,r,B.lQ,r,r,r,r,r,r,r,r,B.XH,r,r,r,r,r,r,r,r))],o),B.C,B.F,B.Q,0),r),B.M,!0)],o),B.C,B.F,B.Q))},
 xA(a,b,c){var s=null
 return A.dR(A.b([A.br(a,s,s,s,B.C8,s,s),A.br(b,s,s,s,A.ft(s,s,c,s,s,s,s,s,"monospace",s,s,14,s,s,B.ag,s,s,!0,s,s,s,s,s,s,s,s),s,s)],t.p),B.C,B.dY,B.Q,0)}}
@@ -44746,17 +44747,13 @@ $S:0}
 A.D9.prototype={
 ah(){return new A.Xs()}}
 A.Xs.prototype={
-l(){this.a.c.a8()
-this.aB()},
 J(a){var s=null,r=A.mD(B.p1,1.2),q=A.bz(10)
-return A.qD(s,A.cf(new A.f5($.kP.Xh(0.8),$.fz(),this.a.c,s),B.bj,s,new A.c0(B.l,s,r,q,B.P9,s,B.a_),s,s,s,s),180,s,20,s,80,320)}}
+return A.qD(s,A.cf(new A.f5($.kP.Xh(0.8),$.fz(),this.a.c,!1,s),B.bj,s,new A.c0(B.l,s,r,q,B.P9,s,B.a_),s,s,s,s),180,s,20,s,80,320)}}
 A.A6.prototype={
 ah(){return new A.TB()}}
 A.TB.prototype={
-l(){this.a.c.a8()
-this.aB()},
 J(a){var s=null
-return A.v3(0,A.cf(new A.f5($.kP,$.fz(),this.a.c,s),B.p,B.V,s,s,s,s,s))}}
+return A.v3(0,A.cf(new A.f5($.kP,$.fz(),this.a.c,!1,s),B.p,B.V,s,s,s,s,s))}}
 A.qb.prototype={
 ah(){return new A.G0(new A.h7(),new A.rf(B.fY,$.al()),A.vo(0))}}
 A.hF.prototype={}
@@ -44786,7 +44783,7 @@ akB(){var s=this,r=null,q=s.goh()[s.w],p=B.e.ha(s.e.a.a)
 if(p.length===0)p=q.d
 s.d.dd(A.eM(r,q.a+" "+p,q.c,r,r,B.ag,r,r,r,r,r,1,r,r,r,r,B.aq))},
 amb(){this.S(new A.aqZ(this))},
-J(a){var s,r,q,p=this,o=null,n=A.hK(o,o,o,o,o,B.a2H),m=A.e0(new A.f5(B.Db,$.fz(),p.d,o)),l=p.goh(),k=A.cW(A.aP9(p.f,new A.ar0(p),8,B.ak,new A.ar1()),52,o),j=B.j.b_(0.06)
+J(a){var s,r,q,p=this,o=null,n=A.hK(o,o,o,o,o,B.a2H),m=A.e0(new A.f5(B.Db,$.fz(),p.d,!1,o)),l=p.goh(),k=A.cW(A.aP9(p.f,new A.ar0(p),8,B.ak,new A.ar1()),52,o),j=B.j.b_(0.06)
 j=A.e0(A.aiA(p.e,A.aDU(o,new A.hn(4,A.bz(12),B.m),o,o,o,o,o,o,!0,o,o,o,o,o,o,j,!0,o,o,o,o,o,o,o,o,o,o,o,o,o,B.a1x,"A line for the mount to carry\u2026",o,o,o,o,o,!0,o,o,o,!0,!0,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o),B.a23))
 s=A.cC(o,o,l[p.w].e,o,o,o,o,o,o,B.j,o,o,B.Lw,o,o,o,o,o,o,o)
 r=t.p
@@ -44882,7 +44879,7 @@ r=A.bz(16)
 q=A.mD(B.ch,1)
 p=A.bz(16)
 n=k.gB(0)
-r=A.e0(A.cf(A.tG(p,new A.f5(k,$.fz(),m.d,new A.cY(n,t.f3)),B.bj),B.p,l,new A.c0(B.l,l,q,r,l,l,B.a_),l,B.f9,l,l))
+r=A.e0(A.cf(A.tG(p,new A.f5(k,$.fz(),m.d,!1,new A.cY(n,t.f3)),B.bj),B.p,l,new A.c0(B.l,l,q,r,l,l,B.a_),l,B.f9,l,l))
 q=B.j.b_(0.04)
 n=A.bz(20)
 return A.hq(j,B.k6,A.dr(A.b([s,r,A.fT(!0,new A.bq(B.cl,A.dr(A.b([A.cf(A.br("Live engine config: fontSize "+A.k(k.a)+"px | trackHeight "+A.k(k.cy)+"px",l,l,l,B.ZF,l,l),B.p,l,new A.c0(q,l,l,n,l,l,B.a_),l,l,B.ps,l)],i),B.C,B.F,B.Q),l),B.M,!0)],i),B.C,B.F,B.Q))}}
@@ -44956,7 +44953,7 @@ l(){this.d.a8()
 this.aB()},
 J(a){var s,r=this,q=null,p=$.kP,o=A.hK(q,B.hn,!0,0,A.lb(q,q,B.q6,q,q,new A.auI(a),q,q,q),B.a2J),n=A.bz(16),m=A.mD(B.ch,1),l=A.bz(16),k=t.p,j=A.b([],k)
 if(r.f){s=p.gB(0)
-j.push(A.v3(0,new A.f5(p,$.fz(),r.d,new A.cY("css_spritesheet_aligned_"+s,t.kK))))}else j.push(B.FV)
+j.push(A.v3(0,new A.f5(p,$.fz(),r.d,!1,new A.cY("css_spritesheet_aligned_"+s,t.kK))))}else j.push(B.FV)
 n=A.e0(A.cf(A.tG(l,A.fW(B.bs,j,B.O,B.bd,q),B.bj),B.p,q,new A.c0(B.l,q,m,n,q,q,B.a_),q,B.cl,q,q))
 m=A.bz(26)
 l=A.b([new A.bc(0,B.H,B.oh.b_(0.2),B.m_,12)],t.V)
@@ -44980,7 +44977,7 @@ $.Y.ok$.push(new A.awn(this))},
 afZ(){var s,r,q,p=this,o=null,n=[A.eM(o,"\u26a1 Tap-down target \u26a1",o,o,o,o,new A.awe(p),new A.awf(p),new A.awg(p),new A.awh(p),o,1,o,o,o,o,B.aq),A.eM(o,"\ud83d\udd25 Concurrent multi-gesture stress \ud83d\udd25",o,o,o,o,new A.awi(p),new A.awj(p),new A.awk(p),new A.awl(p),o,1,o,o,o,o,B.aq),B.Dh]
 for(s=p.d,r=0;r<4;++r)for(q=0;q<3;++q)s.dd(n[q])},
 J(a){var s,r,q,p=this,o=null,n=A.hK(o,B.j,!0,0,A.lb(o,o,B.MF,o,o,new A.awp(a),o,o,o),B.a2T),m=A.bz(16),l=t.V,k=A.b([new A.bc(0,B.H,B.l.b_(0.15),B.iy,15)],l),j=t.p
-k=A.cf(A.tG(A.bz(16),A.fW(B.bs,A.b([B.FS,A.v3(0,new A.f5($.kP.Xh(0.7),$.fz(),p.d,o)),A.qD(0,A.cf(B.VS,B.p,o,new A.c0(o,o,o,o,o,new A.iX(B.jK,B.jL,B.b4,A.b([B.l.b_(0.6),B.u],t.d),o,o),B.a_),40,o,B.f9,o),o,o,0,0,o,o)],j),B.O,B.bd,o),B.bj),B.p,o,new A.c0(B.l,o,o,m,k,o,B.a_),220,B.cl,o,o)
+k=A.cf(A.tG(A.bz(16),A.fW(B.bs,A.b([B.FS,A.v3(0,new A.f5($.kP.Xh(0.7),$.fz(),p.d,!0,o)),A.qD(0,A.cf(B.VS,B.p,o,new A.c0(o,o,o,o,o,new A.iX(B.jK,B.jL,B.b4,A.b([B.l.b_(0.6),B.u],t.d),o,o),B.a_),40,o,B.f9,o),o,o,0,0,o,o)],j),B.O,B.bd,o),B.bj),B.p,o,new A.c0(B.l,o,o,m,k,o,B.a_),220,B.cl,o,o)
 m=A.bz(25)
 l=A.b([new A.bc(0,B.H,B.eZ.b_(0.3),B.ix,10)],l)
 l=A.cf(A.iQ(B.MM,B.a2W,p.gafY(),A.cC(o,o,B.u,o,o,o,o,o,o,o,o,o,o,B.u,new A.bL(A.bz(25),B.m),o,o,o,o,o)),B.p,o,new A.c0(o,o,o,m,l,B.NS,B.a_),50,o,o,1/0)
@@ -48242,9 +48239,7 @@ this.aB()},
 J(a){var s,r=this.d
 r===$&&A.a()
 s=A.Ku(new A.ua(!0,A.aDF(!1,r,t.ma),null),B.O,null)
-this.a.toString
-s=A.jT(s,!0,null)
-return s}}
+return!this.a.f?A.jT(s,!0,null):s}}
 A.hJ.prototype={
 H(){return"AnimationStatus."+this.b},
 gjg(){var s,r=this
