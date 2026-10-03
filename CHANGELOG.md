@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
+## 0.0.9
+
+### Added - VOD timelines: comments dispatched by media time
+
+- **`BarrageItem.at`.** An optional time offset that marks a message as belonging to a recorded stream's comment list rather than to a live socket. `null` keeps the existing behaviour: dispatch on arrival.
+- **`loadTimeline(items)` / `seekTo(position)`** on `BarrageController` and `BarrageEngineApi`. A host hands the engine a whole comment list once; items are released as the media reaches their time. `seekTo` moves the logic clock, drops what is on screen (it belongs to the position being left) and keeps the rest of the timeline, so dragging backwards replays.
+- **`playbackRate` on the controller and engine API.** It already existed on the concrete engine; it is now part of the contract, so a host mirroring the video's speed does not have to downcast.
+- **`BarrageController.dispose()`.** Clears and detaches, for a host whose controller outlives the widget.
+- **Timed messages are exempt from `maxPendingAge`.** That limit is wall-clock, so a viewer who paused for ten seconds would previously have had the comment at this position discarded as stale; a timed message is due by media time instead.
+- **Retraction reaches unreleased timeline items.** `retractWhere` already covered the queue and the screen; it now also removes a recalled comment that has not appeared yet, and reports only removals the viewer could have seen.
+- **A loaded timeline counts as pending work**, so the idle-pause no longer stops the clock before the next comment's moment arrives.
+- **First test suite** (`test/barrage_timeline_test.dart`, 15 cases) covering ordering, single release, forward/backward seeks, boundary equality, retraction and the clock's seek semantics.
+
+### Changed - `BarrageEngineApi` grew four members
+
+- `loadTimeline`, `seekTo`, and the `playbackRate` getter/setter are now part of the contract. A host that implements `BarrageEngineApi` itself (rather than using `BarrageEngine`) has to add them; code that only talks to `BarrageController` is unaffected.
+
+
 ## 0.0.8
 
 ### Fixed - motion smoothness on high-fps displays

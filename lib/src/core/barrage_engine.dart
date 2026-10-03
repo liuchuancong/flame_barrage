@@ -94,7 +94,9 @@ class BarrageEngine extends FlameGame with TapCallbacks implements BarrageEngine
   /// Global speed multiplier applied to the logic clock. 1.0 runs at the
   /// configured speeds; 0.5 slow motion, 2.0 fast forward. Affects scroll
   /// travel and how long fixed messages stay pinned, together.
+  @override
   double get playbackRate => _ctx.clock.scale;
+  @override
   set playbackRate(double rate) => _ctx.clock.scale = rate.clamp(0.05, 8.0).toDouble();
 
   // ========================
@@ -343,6 +345,26 @@ class BarrageEngine extends FlameGame with TapCallbacks implements BarrageEngine
   @override
   void pushMessage(BarrageItem item) {
     _dataSystem.pushMessage(item);
+    _resumeLoopIfNeeded();
+  }
+
+  @override
+  void loadTimeline(List<BarrageItem> items) {
+    _dataSystem.loadTimeline(items);
+    // A loaded timeline is pending work even though the dispatch queue is
+    // empty, and an idle-paused loop never advances the clock that would
+    // release its first message.
+    _resumeLoopIfNeeded();
+  }
+
+  @override
+  void seekTo(Duration position) {
+    final ms = position.inMicroseconds / 1000.0;
+    _ctx.clock.seekToMs(ms);
+    _dataSystem.seekTimeline(position);
+    // What is on screen belongs to the position being left. Retracting rather
+    // than clearing keeps the loaded timeline, the caches and the lane state.
+    _motionSystem.retractWhere((_) => true);
     _resumeLoopIfNeeded();
   }
 

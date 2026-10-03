@@ -52,6 +52,31 @@ class BarrageController {
 
   void clear() => _engine?.clear();
 
+  /// Loads a recorded stream's comments, dispatched by media time.
+  ///
+  /// Each item needs [BarrageItem.at]; items without one are ignored, because
+  /// a message with no time belongs on [send] (the live path).
+  void loadTimeline(List<BarrageItem> items) => _engine?.loadTimeline(items);
+
+  /// Seeks the timeline — and the screen — to [position].
+  void seekTo(Duration position) => _engine?.seekTo(position);
+
+  /// Global speed multiplier, normally mirroring the video's playback rate.
+  double get playbackRate => _engine?.playbackRate ?? 1.0;
+
+  /// Sets the global speed multiplier (clamped by the engine).
+  set playbackRate(double rate) => _engine?.playbackRate = rate;
+
+  /// Releases the engine and empties the screen.
+  ///
+  /// The widget already detaches on its own dispose; this is for a host that
+  /// owns the controller beyond the widget's lifetime, so a leaked controller
+  /// cannot keep pushing into a dead engine.
+  void dispose() {
+    clear();
+    detach();
+  }
+
   /// Takes back every message matching [predicate] — on screen, waiting for a
   /// lane, or parked in the pause buffer (host-side retraction: the platform
   /// recalled a chat message). Returns how many were taken back.

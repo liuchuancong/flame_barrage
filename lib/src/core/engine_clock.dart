@@ -37,5 +37,15 @@ class EngineClock {
     _isPaused = false;
   }
 
+  /// Jumps the logical clock to [ms], keeping the current pause state.
+  ///
+  /// This is what a host seek does: the clock *is* the media position for a
+  /// loaded timeline, so moving the media has to move the clock, and a paused
+  /// seek must stay paused. Negative values clamp to zero rather than
+  /// producing a position no timeline can match.
+  void seekToMs(double ms) {
+    _elapsedMs = ms < 0.0 ? 0.0 : ms;
+  }
+
   bool get isPaused => _isPaused;
 }

@@ -16,12 +16,21 @@ import '../scheduler/track_allocator.dart';
 import '../util/barrage_logger.dart';
 import '../core/barrage_config.dart';
 import '../core/barrage_context.dart';
+import '../core/barrage_timeline.dart';
 
 class _PendingBarrage {
-  const _PendingBarrage(this.item, this.enqueuedAtMs);
+  const _PendingBarrage(this.item, this.enqueuedAtMs, {this.timed = false});
 
   final BarrageItem item;
   final int enqueuedAtMs;
+
+  /// Whether this message came off a loaded timeline rather than a live send.
+  ///
+  /// A timed message is due by media time, not by how long it has sat in the
+  /// queue: a viewer who pauses for ten seconds and resumes must still get the
+  /// comment that belongs at this position, which the wall-clock age limit
+  /// would otherwise have discarded.
+  final bool timed;
 }
 
 /// Owns the waiting queue, dispatch pacing, pre-layout and lane placement.
@@ -56,8 +65,35 @@ class BarrageDataSystem extends Component {
   /// gallop cadence, meteor angle...). One shared Random: cheap and enough.
   final math.Random _fxRandom = math.Random();
 
-  bool get hasPending => _waiting.isNotEmpty || _pausedBuffer.isNotEmpty;
+  bool get hasPending =>
+      _waiting.isNotEmpty || _pausedBuffer.isNotEmpty || _timeline.hasUpcoming;
   int get pendingCount => _waiting.length + _pausedBuffer.length;
+
+  /// Comments of a recorded stream, dispatched by media time.
+  final BarrageTimeline _timeline = BarrageTimeline();
+
+  /// Whether a timeline is loaded.
+  bool get hasTimeline => !_timeline.isEmpty;
+
+  /// Loads a recorded stream's comments, replacing any previous timeline.
+  void loadTimeline(List<BarrageItem> items) => _timeline.load(items);
+
+  /// Moves the timeline's read position to [position].
+  ///
+  /// Only the queue half happens here; taking the old position's messages off
+  /// screen is the engine's job.
+  void seekTimeline(Duration position) => _timeline.seekTo(position);
+
+  /// Hands the items [position] has reached to the waiting queue.
+  void _releaseDueTimelineItems() {
+    if (!_timeline.hasUpcoming) return;
+    final mediaTime = Duration(
+      microseconds: (_ctx.clock.nowPrecise() * 1000).round(),
+    );
+    for (final item in _timeline.dueBy(mediaTime)) {
+      pushMessage(item, timed: true);
+    }
+  }
 
   void pause() => _paused = true;
 
@@ -77,8 +113,12 @@ class BarrageDataSystem extends Component {
     }
   }
 
-  void pushMessage(BarrageItem item) {
-    final pending = _PendingBarrage(item, DateTime.now().millisecondsSinceEpoch);
+  void pushMessage(BarrageItem item, {bool timed = false}) {
+    final pending = _PendingBarrage(
+      item,
+      DateTime.now().millisecondsSinceEpoch,
+      timed: timed,
+    );
     final maxPendingCount = _ctx.config.maxPendingCount.clamp(1, 10000);
     while (_waiting.length + _pausedBuffer.length >= maxPendingCount) {
       if (_waiting.isNotEmpty) {
@@ -97,22 +137,27 @@ class BarrageDataSystem extends Component {
   void clear() {
     _waiting.clear();
     _pausedBuffer.clear();
+    _timeline.clear();
     _paused = false;
     _emitTimer = 0.0;
   }
 
   /// Drops every message still waiting for a lane (or parked in the pause
-  /// buffer) whose item matches [predicate] — the queue half of a host-side
-  /// retraction. Returns how many were dropped.
+  /// buffer, or not yet released by a loaded timeline) whose item matches
+  /// [predicate] — the queue half of a host-side retraction. Returns how many
+  /// were dropped.
   int retractWhere(bool Function(BarrageItem item) predicate) {
     final before = _waiting.length + _pausedBuffer.length;
     _waiting.removeWhere((pending) => predicate(pending.item));
     _pausedBuffer.removeWhere((pending) => predicate(pending.item));
-    return before - (_waiting.length + _pausedBuffer.length);
+    return before - (_waiting.length + _pausedBuffer.length) +
+        _timeline.retractWhere(predicate);
   }
 
   @override
   void update(double dt) {
+    _releaseDueTimelineItems();
+
     if (_ctx.config.realtimeMode) {
       // Unthrottled: flush the whole waiting queue every logic frame, still
       // bounded by maxVisibleCount and lane availability. Bursts appear the
@@ -160,7 +205,11 @@ class BarrageDataSystem extends Component {
   bool _dispatchOne(double now) {
     final wallNow = DateTime.now().millisecondsSinceEpoch;
     final maxAgeMs = _ctx.config.maxPendingAge.inMilliseconds.clamp(0, 600000);
-    while (_waiting.isNotEmpty && wallNow - _waiting.first.enqueuedAtMs > maxAgeMs) {
+    // A timed message is exempt: it is due by media time, and a viewer who
+    // pauses past maxPendingAge must still get the comment at this position.
+    while (_waiting.isNotEmpty &&
+        !_waiting.first.timed &&
+        wallNow - _waiting.first.enqueuedAtMs > maxAgeMs) {
       _waiting.removeFirst();
     }
     if (_waiting.isEmpty) return false;

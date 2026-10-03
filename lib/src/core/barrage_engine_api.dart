@@ -25,6 +25,27 @@ abstract class BarrageEngineApi {
   /// Releases every entry, queue and cached artifact.
   void clear();
 
+  /// Loads a recorded stream's comments, to be dispatched by media time.
+  ///
+  /// Items without [BarrageItem.at] are ignored — they belong on [pushMessage],
+  /// which is the live path. Loading replaces any previous timeline.
+  void loadTimeline(List<BarrageItem> items);
+
+  /// Moves the timeline to [position] and takes the current screen with it.
+  ///
+  /// The messages on screen belong to the old position: a viewer who drags the
+  /// progress bar expects the picture to change, not to keep watching last
+  /// minute's comments scroll past. Comments ahead of [position] stay loaded
+  /// and arrive when the media reaches them; seeking backwards replays them.
+  void seekTo(Duration position);
+
+  /// Global speed multiplier applied to the logic clock, and therefore to the
+  /// media position a loaded timeline is read against.
+  double get playbackRate;
+
+  /// Sets the global speed multiplier. See [playbackRate].
+  set playbackRate(double rate);
+
   /// Takes back every message — on screen or still waiting for a lane — whose
   /// [BarrageItem] matches [predicate] (host-side retraction: the platform
   /// recalled a chat message). Returns how many were taken back.
