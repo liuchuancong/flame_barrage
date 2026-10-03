@@ -101,6 +101,16 @@ class BarrageDataSystem extends Component {
     _emitTimer = 0.0;
   }
 
+  /// Drops every message still waiting for a lane (or parked in the pause
+  /// buffer) whose item matches [predicate] — the queue half of a host-side
+  /// retraction. Returns how many were dropped.
+  int retractWhere(bool Function(BarrageItem item) predicate) {
+    final before = _waiting.length + _pausedBuffer.length;
+    _waiting.removeWhere((pending) => predicate(pending.item));
+    _pausedBuffer.removeWhere((pending) => predicate(pending.item));
+    return before - (_waiting.length + _pausedBuffer.length);
+  }
+
   @override
   void update(double dt) {
     if (_ctx.config.realtimeMode) {

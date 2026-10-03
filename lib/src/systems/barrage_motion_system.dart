@@ -1,6 +1,7 @@
 import 'package:flame/components.dart';
 
 import '../model/barrage/barrage_entry.dart';
+import '../model/barrage/barrage_item.dart';
 import '../model/barrage/barrage_type.dart';
 import '../core/barrage_context.dart';
 
@@ -82,6 +83,32 @@ class BarrageMotionSystem extends Component {
       i++;
     }
     _advanceParticles(now);
+  }
+
+  /// Takes every on-screen message matching [predicate] back off the screen
+  /// (host-side retraction): releases its bitmap, returns the entry to the
+  /// pool, drops it from the active list and clears any lane lock it held.
+  /// Returns how many messages were taken back.
+  ///
+  /// Entries that are still waiting for a lane are dropped by
+  /// [BarrageDataSystem.retractWhere]; callers that need both should go
+  /// through [BarrageEngine.retractWhere].
+  int retractWhere(bool Function(BarrageItem item) predicate) {
+    final entries = _ctx.activeEntries;
+    var removed = 0;
+    for (var i = entries.length - 1; i >= 0; i--) {
+      final entry = entries[i];
+      if (!predicate(entry.item)) continue;
+      // Same order as the expiry path: drop the lane claim first, then the
+      // bitmap/pool claim.
+      if (entry.fx != null) _releaseLaneLock(entry);
+      _release(entry);
+      final last = entries.length - 1;
+      entries[i] = entries[last];
+      entries.length = last;
+      removed++;
+    }
+    return removed;
   }
 
   /// Clears the lane lock a motion-effect show holds. Only touches the lock

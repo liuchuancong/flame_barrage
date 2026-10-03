@@ -52,6 +52,11 @@ class BarrageController {
 
   void clear() => _engine?.clear();
 
+  /// Takes back every message matching [predicate] — on screen, waiting for a
+  /// lane, or parked in the pause buffer (host-side retraction: the platform
+  /// recalled a chat message). Returns how many were taken back.
+  int retractWhere(bool Function(BarrageItem item) predicate) => _engine?.retractWhere(predicate) ?? 0;
+
   bool triggerItemAt(double x, double y, {required bool longPress}) {
     return _engine?.triggerItemAt(x, y, longPress: longPress) ?? false;
   }

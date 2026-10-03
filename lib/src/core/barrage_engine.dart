@@ -347,6 +347,13 @@ class BarrageEngine extends FlameGame with TapCallbacks implements BarrageEngine
   }
 
   @override
+  int retractWhere(bool Function(BarrageItem item) predicate) {
+    final pending = _dataSystem.retractWhere(predicate);
+    final onScreen = _motionSystem.retractWhere(predicate);
+    return pending + onScreen;
+  }
+
+  @override
   void clear() {
     pauseEngine();
     _logicAccum = 0.0;

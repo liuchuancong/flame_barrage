@@ -25,6 +25,11 @@ abstract class BarrageEngineApi {
   /// Releases every entry, queue and cached artifact.
   void clear();
 
+  /// Takes back every message — on screen or still waiting for a lane — whose
+  /// [BarrageItem] matches [predicate] (host-side retraction: the platform
+  /// recalled a chat message). Returns how many were taken back.
+  int retractWhere(bool Function(BarrageItem item) predicate);
+
   /// Hit-tests the point and fires the matching message's tap or long-press
   /// callback. Returns true when a message was hit and the callback fired.
   bool triggerItemAt(double x, double y, {required bool longPress});

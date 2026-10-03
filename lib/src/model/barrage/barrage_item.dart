@@ -7,6 +7,7 @@ class BarrageItem {
     this.type = BarrageType.scroll,
     this.userId,
     this.userName,
+    this.id,
     this.priority = 0,
     this.effect,
     this.textColor,
@@ -40,6 +41,11 @@ class BarrageItem {
   final BarrageType type;
   final String? userId;
   final String? userName;
+
+  /// Host-side identity of this message (e.g. a platform message id). The
+  /// engine never reads it, but [BarrageController.removeWhere] lets the host
+  /// take one message back by it (retraction).
+  final String? id;
   final int priority;
 
   /// Motion effect: when non-null, [BarrageMotionEffect] takes over the
