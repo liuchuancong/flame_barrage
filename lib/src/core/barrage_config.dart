@@ -34,6 +34,9 @@ class BarrageConfig {
     this.baseSpeed = 120.0,
     this.strokeWidth = 1.0,
     this.overlapSafeGap = 40.0,
+    this.hideTop = false,
+    this.hideBottom = false,
+    this.hideScroll = false,
     this.noEmojiMode = false,
     this.barragePoolMaxSize = 150,
     this.pictureCacheMaxSize = 200,
@@ -124,6 +127,26 @@ class BarrageConfig {
 
   /// The mandatory clearance width buffer required between tailgating elements to avoid overlap.
   final double overlapSafeGap;
+
+  /// Per-type visibility filters. A hidden type is dropped at push time, at
+  /// dispatch time, and — when toggled on through [BarrageController.updateConfig] —
+  /// every on-screen message of that type is retired the same moment, so the
+  /// filter reads as instant instead of waiting for the screen to drain.
+  final bool hideTop;
+  final bool hideBottom;
+  final bool hideScroll;
+
+  /// Whether messages of [type] are filtered out by the current config.
+  bool isTypeHidden(BarrageType type) {
+    switch (type) {
+      case BarrageType.scroll:
+        return hideScroll;
+      case BarrageType.topFixed:
+        return hideTop;
+      case BarrageType.bottomFixed:
+        return hideBottom;
+    }
+  }
 
   /// Toggles pure text rendering by completely culling and bypassing emoji fragments.
   final bool noEmojiMode;
@@ -233,6 +256,9 @@ class BarrageConfig {
       realtimeMode: realtimeMode ?? this.realtimeMode,
       baseSpeed: baseSpeed ?? this.baseSpeed,
       overlapSafeGap: overlapSafeGap ?? this.overlapSafeGap,
+      hideTop: hideTop ?? this.hideTop,
+      hideBottom: hideBottom ?? this.hideBottom,
+      hideScroll: hideScroll ?? this.hideScroll,
       noEmojiMode: noEmojiMode ?? this.noEmojiMode,
       barragePoolMaxSize: barragePoolMaxSize ?? this.barragePoolMaxSize,
       pictureCacheMaxSize: pictureCacheMaxSize ?? this.pictureCacheMaxSize,
@@ -276,6 +302,9 @@ class BarrageConfig {
         other.realtimeMode == realtimeMode &&
         other.baseSpeed == baseSpeed &&
         other.overlapSafeGap == overlapSafeGap &&
+        other.hideTop == hideTop &&
+        other.hideBottom == hideBottom &&
+        other.hideScroll == hideScroll &&
         other.noEmojiMode == noEmojiMode &&
         other.barragePoolMaxSize == barragePoolMaxSize &&
         other.pictureCacheMaxSize == pictureCacheMaxSize &&
@@ -316,6 +345,9 @@ class BarrageConfig {
       realtimeMode,
       baseSpeed,
       overlapSafeGap,
+      hideTop,
+      hideBottom,
+      hideScroll,
       noEmojiMode,
       barragePoolMaxSize,
       pictureCacheMaxSize,

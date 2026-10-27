@@ -3,6 +3,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import '../model/barrage/barrage_item.dart';
+import '../model/barrage/barrage_type.dart';
 import '../model/barrage/engine_state.dart';
 import '../atlas/emoji_atlas.dart';
 import '../util/barrage_logger.dart';
@@ -51,6 +52,7 @@ class BarrageEngine extends FlameGame with TapCallbacks implements BarrageEngine
     _metricsSystem = BarrageMetricsSystem(_ctx);
     _renderSystem = BarrageRenderSystem(_ctx);
     addAll([_dataSystem, _motionSystem, _metricsSystem, _renderSystem]);
+    _frameInterval = 1.0 / config.fps.clamp(1, 240);
     // Keep Flame's loop paused until the first message arrives; a mounted
     // game otherwise ticks (and repaints) at the display rate even when the
     // room is silent.
@@ -74,6 +76,10 @@ class BarrageEngine extends FlameGame with TapCallbacks implements BarrageEngine
   /// faster than [BarrageConfig.fps].
   double _logicAccum = 0.0;
   int _frameStepCount = 0;
+
+  /// Cached `1 / config.fps`, refreshed only when the config changes so the
+  /// frame path avoids the clamp/divide (and its boxed intermediates) per step.
+  double _frameInterval = 1.0 / 60;
 
   // Step-cost watchdog.
   final Stopwatch _stepWatch = Stopwatch();
@@ -182,13 +188,16 @@ class BarrageEngine extends FlameGame with TapCallbacks implements BarrageEngine
   }
 
   /// Hot-applies configuration. Style and lane-geometry changes rebuild every
-  /// on-screen message right away, so the new look does not have to wait for
-  /// current messages to scroll off; everything else (cache budgets, pacing,
-  /// frame rate) takes effect on the following frames naturally.
+  /// on-screen message (spread across frames so a live-tuned slider does not
+  /// overrun the frame budget); speed and dwell-time changes are re-applied
+  /// to what is already on screen; visibility filters retire hidden messages
+  /// immediately. Everything else (cache budgets, pacing, frame rate) takes
+  /// effect on the following frames naturally.
   @override
   void updateConfig(BarrageConfig newConfig) {
     final old = _ctx.config;
     _ctx.config = newConfig;
+    _frameInterval = 1.0 / newConfig.fps.clamp(1, 240);
     _ctx.parser.updateMaxCacheSize(newConfig.textCacheMaxSize);
     _ctx.layout.updateMaxTextCacheSize(newConfig.textCacheMaxSize);
     _ctx.renderCache.updateLimits(
@@ -204,8 +213,69 @@ class BarrageEngine extends FlameGame with TapCallbacks implements BarrageEngine
         _ctx.trackManager.forceRefresh(newConfig, _ctx.allowedHeight);
       }
       if (geometryChanged || _configAffectsOnScreenStyle(old, newConfig)) {
-        _dataSystem.relayoutActive();
+        // A running loop restyles in bounded batches; with the loop paused
+        // there is no frame to drain the queue through, so do it now.
+        if (isPaused) {
+          _dataSystem.relayoutActive();
+        } else {
+          _dataSystem.scheduleRelayout();
+        }
       }
+      if (old.baseSpeed != newConfig.baseSpeed) {
+        _rescaleScrollSpeeds(old.baseSpeed, newConfig.baseSpeed);
+      }
+      if (old.fixedDuration != newConfig.fixedDuration) {
+        _reexpireFixedEntries(newConfig.fixedDurationMs);
+      }
+      if (old.hideTop != newConfig.hideTop ||
+          old.hideBottom != newConfig.hideBottom ||
+          old.hideScroll != newConfig.hideScroll) {
+        _motionSystem.retireWhere((entry) => newConfig.isTypeHidden(entry.item.type));
+      }
+    }
+  }
+
+  /// Re-applies a base-speed change to the entries already scrolling.
+  ///
+  /// A uniform factor keeps every relative gap intact: entries ahead stay
+  /// ahead, and a follower that was capped below its leader (the speed
+  /// strategy's no-catch-up rule) remains capped after scaling, so no pair
+  /// starts overlapping. Entries with a per-item speed keep their own value.
+  void _rescaleScrollSpeeds(double oldBaseSpeed, double newBaseSpeed) {
+    if (oldBaseSpeed <= 0 || newBaseSpeed <= 0) return;
+    final factor = newBaseSpeed / oldBaseSpeed;
+    if (factor == 1.0) return;
+    final entries = _ctx.activeEntries;
+    for (int i = 0; i < entries.length; i++) {
+      final entry = entries[i];
+      if (entry.fx != null) continue;
+      if (entry.item.type != BarrageType.scroll) continue;
+      if (entry.item.baseSpeed != null) continue;
+      entry.speed *= factor;
+    }
+  }
+
+  /// Re-applies a dwell-time change to the pinned entries already on screen:
+  /// expiry restarts from the entry's own spawn, and the lane lock deadline
+  /// follows so a shortened duration frees the lane the moment the message
+  /// leaves. Entries with a per-item duration keep their own value.
+  void _reexpireFixedEntries(int newDurationMs) {
+    final entries = _ctx.activeEntries;
+    final tracks = _ctx.trackManager.tracks;
+    for (int i = 0; i < entries.length; i++) {
+      final entry = entries[i];
+      if (entry.item.type == BarrageType.scroll) continue;
+      if (entry.fx != null) continue;
+      if (entry.item.fixedDuration != null) continue;
+      final newExpire = entry.spawnTime + newDurationMs;
+      final trackIndex = entry.track;
+      if (trackIndex >= 0 && trackIndex < tracks.length) {
+        final track = tracks[trackIndex];
+        if (track.locked && track.lockedUntil == entry.expireTime) {
+          track.lockedUntil = newExpire;
+        }
+      }
+      entry.expireTime = newExpire;
     }
   }
 
@@ -300,9 +370,16 @@ class BarrageEngine extends FlameGame with TapCallbacks implements BarrageEngine
     // to anything shorter makes scroll velocity depend on frame load, which
     // reads as jerky, uneven motion. The 150 ms guard only absorbs the gap
     // left by a suspend/resume.
-    final frameInterval = 1.0 / _ctx.config.fps.clamp(1, 240);
+    //
+    // The gate carries a 10% tolerance: on a display matching the configured
+    // fps, per-frame dt sits a few hundred microseconds on either side of the
+    // interval, and a strict comparison would skip the short frames only to
+    // step double on the next one — motion updating at half the display rate
+    // while the canvas repaints at full rate, i.e. the classic stutter. With
+    // the tolerance, display ≈ fps steps every frame and only a genuinely
+    // faster display (>= ~1.1x) starts skipping.
     _logicAccum += dt;
-    if (_logicAccum < frameInterval) return;
+    if (_logicAccum < _frameInterval * 0.9) return;
     final elapsed = _logicAccum.clamp(0.0, 0.15).toDouble();
     _logicAccum = 0.0;
     _frameStepCount++;

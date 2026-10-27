@@ -62,6 +62,7 @@ FlameBarrage Engine 是一个基于 Flame 图形框架打造的高性能、硬�
 - 内存受 `pictureCacheMaxSize`（条数）与 `rasterCacheMaxBytes`（显存）双重约束
 - 重复内容（"666"、进场模板）全场共用同一张位图
 - 超过 4096 设备像素的超长弹幕、以及不支持位图光栅化的平台自动回退到矢量绘制
+- 烘焙延迟分帧执行（每帧最多 8 张）：突发洪峰或实时改样式时，光栅化成本摊到随后几帧，而不是砸在落地当帧；未烘焙的弹幕期间走矢量绘制
 
 ### 🎨 双通路文本渲染
 
@@ -73,7 +74,19 @@ FlameBarrage Engine 是一个基于 Flame 图形框架打造的高性能、硬�
 
 ### 📐 配置实时生效
 
-`updateConfig` 无需清屏即可应用配置。当修改会影响在屏弹幕的画面或位置时，所有可见弹幕立即重新排版并重新烘焙：滚动弹幕保持当前位置继续滚动，固定弹幕按新轨道几何重新居中。
+`updateConfig` 无需清屏，且每一类修改都会作用到已经在屏的弹幕：
+
+- 样式 / 轨道几何修改会让所有可见弹幕重新排版：滚动弹幕保持当前位置继续滚动，固定弹幕按新轨道几何重新居中。重排按帧批量执行（每帧限额），实时拖滑块也不会击穿帧预算。
+- `baseSpeed` 变更对正在滚动的弹幕按统一比例缩放（前后车间距与防追尾排序保持不变）。
+- `fixedDuration` 变更从每条固定弹幕自己的入场时间重算到期时刻，轨道锁期限同步跟随。
+- `hideTop` / `hideBottom` / `hideScroll` 可见性过滤：隐藏类型在 `send` 时直接拒收，开关打开的瞬间屏上该类型弹幕即时下屏（含轨道锁释放）。
+- 带单条覆写（`BarrageItem.baseSpeed`、`fixedDuration` 等）的弹幕保持自己的值。
+
+### 🕒 点播时间轴与消息撤回
+
+- **录播场景**：`controller.loadTimeline(items)` 一次性载入整份评论列表（`BarrageItem.at` 携带媒体时间），媒体播放到点自动上屏；`controller.seekTo(position)` 前后拖动均可重放，离开的位置在屏消息会被清掉。
+- **跟随倍速**：时间轴由引擎逻辑时钟驱动，`playbackRate = 2.0`（通常镜像视频倍速）时评论同步 2 倍速。
+- **宿主侧撤回**：`controller.retractWhere((item) => item.id == recalledId)` 把被召回的聊天消息从屏幕、队列与尚未释放的时间轴中一并取回，返回观众可能已看到的条数。
 
 ### 🎯 帧率无关的匀速运动
 
@@ -95,7 +108,7 @@ FlameBarrage Engine 是一个基于 Flame 图形框架打造的高性能、硬�
 ```yaml
 dependencies:
   flame: ^1.38.2
-  flame_barrage: ^0.0.8
+  flame_barrage: ^0.0.10
 ```
 
 ---
@@ -182,10 +195,15 @@ _controller.clear();
 | 成员 | 签名 | 说明 |
 | --- | --- | --- |
 | `send` | `void send(BarrageItem item)` | 入队一条消息（`running == false` 时不发送） |
-| `updateConfig` | `void updateConfig(BarrageConfig config)` | 热更新配置 |
+| `updateConfig` | `void updateConfig(BarrageConfig config)` | 热更新配置；样式、速度、驻留时长与可见性修改同样作用于在屏弹幕 |
 | `pause` / `resume` | `void pause()` / `void resume()` | 停止/恢复推进；暂停期间发送的消息进入缓冲而不丢弃 |
 | `togglePause` | `void togglePause()` | 翻转 `running` |
 | `clear` | `void clear()` | 释放全部条目、队列与缓存资源 |
+| `loadTimeline` | `void loadTimeline(List<BarrageItem> items)` | 载入录播评论列表（每条需 `BarrageItem.at`），按媒体时间上屏 |
+| `seekTo` | `void seekTo(Duration position)` | 时间轴与画面一起 seek；向后拖即重放 |
+| `playbackRate` | `double` 读写 | 全局倍速（0.05–8.0），时间轴评论随之变速 |
+| `retractWhere` | `int retractWhere(bool Function(BarrageItem item) predicate)` | 撤回消息：屏幕 / 队列 / 时间轴一并取回，返回可见侧条数 |
+| `dispose` | `void dispose()` | `clear` + `detach`，控制器比 Widget 生命周期长时使用 |
 | `attach` / `detach` | `void attach(BarrageEngineApi engine)` / `void detach([BarrageEngineApi? engine])` | 绑定/解绑引擎（`FlameBarrageWidget` 自动完成） |
 | `triggerItemAt` | `bool triggerItemAt(double x, double y, {required bool longPress})` | 对指定点做命中测试并触发最上层弹幕回调；未命中返回 false |
 | `running` | `bool` | 发送与引擎推进是否激活 |
@@ -226,6 +244,8 @@ engine.context;                     // 进阶：共享 BarrageContext
 | --- | --- | --- |
 | `content` | `String`（必填） | 原始文本，可内嵌 emoji 按键（由图集正则解析） |
 | `type` | `BarrageType` | `scroll`（默认）/ `topFixed` / `bottomFixed` |
+| `id` | `String?` | 宿主侧身份标识；撤回时在 `retractWhere` 里匹配它 |
+| `at` | `Duration?` | 点播评论的媒体时间（配合 `loadTimeline`）；`null` 表示到达即派发（直播路径） |
 | `priority` | `int` | 轨道竞争时优先级高者胜 |
 | `userId` / `userName` | `String?` | 发送者身份 |
 | `textColor`、`fontSize`、`fontWeight`、`fontStyle`、`fontFamily`、`letterSpacing` | 覆写项 | 单条排版覆写（缺省回退 `BarrageConfig`） |
@@ -267,11 +287,12 @@ engine.context;                     // 进阶：共享 BarrageContext
 | | `fixedDuration` | `Duration` / 4s | 固定弹幕驻留时长 |
 | | `baseSpeed` | `double` / 120 | 滚动速度（px/s） |
 | 派发 | `emitInterval` | `double` / 0.1 | 节流派发间隔（秒） |
-| | `realtimeMode` | `bool` / false | 关闭节流，每逻辑帧整队上屏 |
+| | `realtimeMode` | `bool` / false | 关闭节流，每逻辑帧整队上屏（每帧最多派发 8 条，洪峰不会击穿落地当帧） |
 | | `maxVisibleCount` | `int` / 80 | 同屏弹幕上限 |
 | | `maxPendingCount` | `int` / 120 | 等待队列上限（超出丢弃最旧） |
-| | `maxPendingAge` | `Duration` / 5s | 上屏前超龄消息直接丢弃 |
+| | `maxPendingAge` | `Duration` / 5s | 上屏前超龄消息直接丢弃（点播定时评论豁免） |
 | | `overlapSafeGap` | `double` / 40 | 轨道内最小安全间距 |
+| 可见性 | `hideTop` / `hideBottom` / `hideScroll` | `bool` / false | 按类型过滤：隐藏类型 `send` 拒收、队列排空，开关打开瞬间屏上同类即时下屏 |
 | 资源 | `noEmojiMode` | `bool` / false | 纯文本模式，跳过全部 Emoji |
 | | `barragePoolMaxSize` | `int` / 150 | 条目对象池上限 |
 | | `pictureCacheMaxSize` | `int` / 200 | 渲染缓存条目上限 |
@@ -369,6 +390,28 @@ controller.resumeAllPaused();                // 被冻结的弹幕从原地继�
 | `controller.pauseItemAt(x, y)` | 冻结命中点最上层的弹幕并返回它（未命中返回 null）；被冻结的弹幕保持位置与轨道 |
 | `controller.resumeAllPaused()` | 释放全部被冻结的弹幕 |
 | `controller.pausedCount` | 当前被冻结的弹幕数量 |
+
+### 点播回放（时间轴）
+
+录播场景的评论列表是预先已知的：一次性交给引擎，每条评论在媒体到达其时间点的瞬间上屏：
+
+```dart
+// 拉取评论列表，映射为带时间的条目，一次性载入。
+final comments = await api.fetchComments(videoId);
+controller.loadTimeline([
+  for (final c in comments)
+    BarrageItem(id: c.id, content: c.text, at: c.offset, type: BarrageType.scroll),
+]);
+
+// 跟随播放器进度 seek；前后拖动均可重放。
+controller.seekTo(player.position);
+controller.playbackRate = player.rate;   // 视频 2 倍速 = 评论 2 倍速
+
+// 被召回的评论从所有可能出现的位置消失。
+controller.retractWhere((item) => item.id == recalledId);
+```
+
+定时评论不受 `maxPendingAge` 限制（它们的期限是媒体时间而非墙钟）；已载入的时间轴算作待处理工作，空闲暂停的引擎也会在下一条评论的时刻前醒来。
 
 ### 扩展渲染
 

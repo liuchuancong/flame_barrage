@@ -21,6 +21,25 @@ The format is based on Keep a Changelog and this project adheres to Semantic Ver
 
 - `loadTimeline`, `seekTo`, and the `playbackRate` getter/setter are now part of the contract. A host that implements `BarrageEngineApi` itself (rather than using `BarrageEngine`) has to add them; code that only talks to `BarrageController` is unaffected.
 
+## 0.0.10
+
+### Fixed - scroll motion stepped at half the display rate
+
+- **Logic-step gate now carries a tolerance.** The frame driver throttled logic steps with a strict `accumulator >= 1/fps` comparison. On a display matching the configured fps (60 Hz panel, default `fps: 60`), per-frame dt sits a few hundred microseconds on either side of the interval, so every frame that came in slightly short was skipped and the next frame stepped double — positions updated every other display frame (effective 30 Hz motion) while the canvas repainted at full rate. That quantization read as constant stutter with no overload anywhere in the profile. The gate now steps once the accumulator reaches 90% of the interval: display ≈ fps steps every frame with the real elapsed time, and only a genuinely faster display (≥ ~1.1× fps) starts skipping.
+
+### Fixed - live config updates now reach everything on screen
+
+- **Visibility filters work.** `BarrageConfig.copyWith` accepted `hideTop`/`hideBottom`/`hideScroll` but the fields did not exist on the config, so the values were silently dropped and the filters did nothing. The fields are real now: hidden types are rejected at `send` time, drained from the waiting queue at dispatch, and — when the filter is toggled through `updateConfig` — every on-screen message of that type is retired the same moment (render claim released, lane lock freed, entry recycled) instead of waiting for the screen to drain.
+- **`baseSpeed` applies to messages already scrolling.** Speed was computed once at dispatch, so a slider change only affected new arrivals and the screen kept a mix of old and new speeds for a full travel time. On a config change, on-screen scroll entries rescale by `new/old` — a uniform factor, so relative gaps and the no-catch-up ordering between leader and follower are preserved exactly. Entries with a per-item `baseSpeed` keep their own value.
+- **`fixedDuration` applies to pinned messages already on screen.** Expiry restarts from each entry's own spawn time and the lane-lock deadline follows, so shortening the dwell frees the lane the moment the message leaves instead of at the old deadline.
+
+### Performance - bounded restyle cost, quieter caches
+
+- **Deferred bitmap baking.** Baking a message bitmap (device-scaled re-record + `toImageSync` rasterization + texture upload) used to happen in the frame the message was dispatched in, so a dense stream kept spiking the raster thread and a config-drag restyle baked dozens of bitmaps at once. Baking now goes through a queue drained at 8 bitmaps per frame; a not-yet-baked message draws through its vector recording — which already carries the current style — until its turn comes. Cache byte accounting happens when the bitmap lands (`RenderCache.accountBytes`).
+- **Realtime-mode dispatch cap.** The unthrottled mode flushed the whole waiting queue in one logic frame; a large burst therefore spent its layout and recording cost the exact frame it landed in. Dispatch still bypasses the pacing timer, but is capped at 8 messages per frame — a burst now appears over a couple of frames instead of blowing the frame it arrives in.
+- **Batched on-screen restyle.** A style/geometry config change used to re-layout, re-record and re-bake every visible message in the frame the change arrived — on a full screen that one frame overran its budget, which is exactly what a host tuning the config live felt as stutter. `updateConfig` now schedules the restyle and the data system applies it in batches (8 entries per frame), so the whole screen still converges within a few frames at a bounded per-frame cost. With the loop paused it still applies synchronously.
+- **Allocation-free cache eviction.** `RenderCache` materialized a full copy of its key list on every insert that sat at the size/byte budget — i.e. on nearly every dispatched message in a busy stream. Eviction now walks the LRU order in place.
+- **Paragraph cache resizes in place.** Changing `textCacheMaxSize` used to dispose every cached paragraph and rebuild both text/layout caches, forcing a full re-shape of the next frame's messages — a visible hitch while dragging the budget slider. Limits now shrink the caches by LRU eviction only.
 
 ## 0.0.8
 

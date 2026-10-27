@@ -26,6 +26,16 @@ class CachedRender {
   /// glows and shadows extend past the text bounds and must not be clipped.
   double padding = 0;
 
+  /// Content size the bitmap should be baked for, recorded at insertion so
+  /// baking can be deferred to a later frame instead of spiking the frame the
+  /// message appeared in. Zero until the render is stored.
+  double contentWidth = 0;
+  double contentHeight = 0;
+
+  /// True while this render sits in a deferred bake queue, so repeated
+  /// acquisitions don't enqueue it twice.
+  bool bakeQueued = false;
+
   /// Logical size of the baked region (content plus padding).
   double rasterWidth = 0;
   double rasterHeight = 0;
@@ -133,6 +143,17 @@ class RenderCache {
     _trim();
   }
 
+  /// Adds a bitmap's bytes to the budget after it was baked post-insert
+  /// (deferred baking inserts with no image and therefore zero bytes).
+  /// Trims if the budget is exceeded; the baked render survives eviction
+  /// while an on-screen entry still holds a claim on it.
+  void accountBytes(CachedRender render) {
+    final bytes = render.byteSize;
+    if (bytes == 0) return;
+    _bytes += bytes;
+    _trim();
+  }
+
   /// Drops every entry. Entries still drawn by a live barrage are disposed as
   /// soon as that barrage is released.
   void clear() {
@@ -150,10 +171,17 @@ class RenderCache {
   }
 
   void _trim({String? keep}) {
-    if (_entries.length <= maxSize && _bytes <= maxBytes) return;
-    for (final key in _entries.keys.toList(growable: false)) {
-      if (_entries.length <= maxSize && _bytes <= maxBytes) break;
-      if (key == keep) continue;
+    // Evicts LRU-head entries in place. A busy stream sits at the size or
+    // byte budget on nearly every insert; materializing the key list per
+    // eviction pass (the previous approach) copied hundreds of strings per
+    // dispatched message, which reads as periodic GC stutter on weak hardware.
+    while (_entries.length > maxSize || _bytes > maxBytes) {
+      if (_entries.isEmpty) return;
+      var key = _entries.keys.first;
+      if (key == keep) {
+        if (_entries.length <= 1) return;
+        key = _entries.keys.elementAt(1);
+      }
       final evicted = _entries.remove(key);
       if (evicted != null) _forget(evicted);
     }

@@ -70,6 +70,7 @@ Each message is recorded once as a vector display list, then baked into a GPU-re
 - Bounded by `pictureCacheMaxSize` entries and `rasterCacheMaxBytes` of GPU memory
 - Repeated content ("666", welcome templates) shares a single bitmap across every instance
 - Messages longer than 4096 device pixels, and platforms without picture rasterization, transparently keep the vector path
+- Baking is deferred and budgeted (8 bitmaps per frame): a burst or a live restyle spreads its rasterization cost over a few frames instead of spiking the one frame it lands in, and not-yet-baked messages draw through their vector recording meanwhile
 
 ### 🎨 Dual-Pass Typography Rendering
 
@@ -81,7 +82,19 @@ Text outlines and fills are rendered as independent paragraphs, avoiding font-ca
 
 ### 📐 Live Configuration Restyling
 
-`updateConfig` applies changes without clearing the screen. When a change affects what on-screen messages look like or where they sit, every visible message is re-laid out and re-baked immediately: scrolling messages keep their position, pinned messages re-center under the new lane geometry.
+`updateConfig` applies changes without clearing the screen, and every change reaches what is already on screen:
+
+- Style / lane-geometry changes re-lay out every visible message: scrolling messages keep their position, pinned messages re-center under the new lane geometry. The restyle runs in bounded per-frame batches, so dragging a slider live never overruns a frame budget.
+- A `baseSpeed` change rescales the entries already scrolling (a uniform factor, so gaps and the no-catch-up ordering are preserved).
+- A `fixedDuration` change re-expires pinned messages from their own spawn time and moves the lane-lock deadline with them.
+- `hideTop` / `hideBottom` / `hideScroll` visibility filters drop hidden messages at `send` time and retire whatever of that type is already on screen the moment the filter is toggled — lane locks included.
+- Messages with per-item overrides (`BarrageItem.baseSpeed`, `fixedDuration`, …) keep their own values.
+
+### 🕒 VOD Timelines & Retraction
+
+- **Recorded streams:** `controller.loadTimeline(items)` hands the engine a whole comment list (`BarrageItem.at` carries each comment's media time); items appear exactly when the media reaches their time. `controller.seekTo(position)` replays backwards and forwards, dropping the on-screen messages of the position being left.
+- **Playback-rate aware:** the timeline is driven by the engine's logic clock, so `playbackRate = 2.0` (normally mirroring the video) speeds the comments up with it.
+- **Host-side retraction:** `controller.retractWhere((item) => item.id == recalledId)` takes a recalled chat message back off the screen — and out of the queue and the not-yet-released timeline — returning how many the viewer could have seen.
 
 ### 🎯 Frame-Rate Independent Motion
 
@@ -99,7 +112,7 @@ Positions integrate against a sub-millisecond logic clock using the real elapsed
 ```yaml
 dependencies:
   flame: ^1.38.2
-  flame_barrage: ^0.0.8
+  flame_barrage: ^0.0.10
 ```
 
 ---
@@ -186,10 +199,15 @@ Type-safe facade between host code and the engine.
 | Member | Signature | Description |
 | --- | --- | --- |
 | `send` | `void send(BarrageItem item)` | Enqueue a message (no-op while `running == false`) |
-| `updateConfig` | `void updateConfig(BarrageConfig config)` | Hot-apply configuration |
+| `updateConfig` | `void updateConfig(BarrageConfig config)` | Hot-apply configuration; style, speed, dwell-time and visibility changes reach on-screen messages too |
 | `pause` / `resume` | `void pause()` / `void resume()` | Stop/advance the engine; messages sent while paused buffer instead of dropping |
 | `togglePause` | `void togglePause()` | Flip `running` |
 | `clear` | `void clear()` | Release every entry, queue and cached artifact |
+| `loadTimeline` | `void loadTimeline(List<BarrageItem> items)` | Load a recorded stream's comments (each needs `BarrageItem.at`); dispatched as the media reaches their time |
+| `seekTo` | `void seekTo(Duration position)` | Seek the timeline and the screen; dragging backwards replays |
+| `playbackRate` | `double` get/set | Global speed multiplier (0.05–8.0); timeline comments follow it |
+| `retractWhere` | `int retractWhere(bool Function(BarrageItem item) predicate)` | Take a recalled message back off the screen / queue / timeline; returns how many were visible-side |
+| `dispose` | `void dispose()` | `clear` + `detach`, for a controller outliving the widget |
 | `attach` / `detach` | `void attach(BarrageEngineApi engine)` / `void detach([BarrageEngineApi? engine])` | Bind/unbind the engine (done automatically by `FlameBarrageWidget`) |
 | `triggerItemAt` | `bool triggerItemAt(double x, double y, {required bool longPress})` | Hit-test a point and fire the top-most matching message's callback; returns false when nothing hit |
 | `running` | `bool` | Whether sends and engine advancement are active |
@@ -230,6 +248,8 @@ The immutable message description.
 | --- | --- | --- |
 | `content` | `String` (required) | Raw text; may embed emoji keys resolved by the atlas regex |
 | `type` | `BarrageType` | `scroll` (default) / `topFixed` / `bottomFixed` |
+| `id` | `String?` | Host-side identity; match it in `retractWhere` to recall a message |
+| `at` | `Duration?` | Media time for VOD comments (`loadTimeline`); `null` means dispatch on arrival (the live path) |
 | `priority` | `int` | Higher wins contested lane allocation |
 | `userId` / `userName` | `String?` | Sender identity |
 | `textColor`, `fontSize`, `fontWeight`, `fontStyle`, `fontFamily`, `letterSpacing` | overrides | Per-message typography (falls back to `BarrageConfig`) |
@@ -271,11 +291,12 @@ All engine tuning. Every field is hot-appliable via `copyWith`; style and lane-g
 | | `fixedDuration` | `Duration` / 4s | Dwell time for pinned messages |
 | | `baseSpeed` | `double` / 120 | Scroll speed in px/s |
 | Dispatch | `emitInterval` | `double` / 0.1 | Seconds between paced dispatches |
-| | `realtimeMode` | `bool` / false | Bypass pacing; flush the queue every logic frame |
+| | `realtimeMode` | `bool` / false | Bypass pacing; flush the queue every logic frame (capped at 8 dispatches per frame so a burst cannot blow the frame it lands in) |
 | | `maxVisibleCount` | `int` / 80 | On-screen message cap |
 | | `maxPendingCount` | `int` / 120 | Queue cap (oldest dropped beyond it) |
-| | `maxPendingAge` | `Duration` / 5s | Drop messages older than this before dispatch |
+| | `maxPendingAge` | `Duration` / 5s | Drop messages older than this before dispatch (timed VOD comments are exempt) |
 | | `overlapSafeGap` | `double` / 40 | Minimum clearance between messages in a lane |
+| Visibility | `hideTop` / `hideBottom` / `hideScroll` | `bool` / false | Per-type filters: hidden types are rejected at `send`, drained from the queue, and retired from the screen the moment the filter turns on |
 | Resources | `noEmojiMode` | `bool` / false | Render text only, skip all emoji fragments |
 | | `barragePoolMaxSize` | `int` / 150 | Entry pool size |
 | | `pictureCacheMaxSize` | `int` / 200 | Render cache entry cap |
@@ -373,6 +394,28 @@ controller.resumeAllPaused();                // held messages continue from the 
 | `controller.pauseItemAt(x, y)` | Holds the top-most message at the point; returns it (or null on a miss). Held messages keep their position and lane |
 | `controller.resumeAllPaused()` | Releases every held message |
 | `controller.pausedCount` | How many messages are currently held |
+
+### VOD Playback (timelines)
+
+A recorded stream's comment list is known up front; hand it to the engine once and each line appears at the instant the media reaches its time:
+
+```dart
+// Fetch your comment list, map it to timed items, load it once.
+final comments = await api.fetchComments(videoId);
+controller.loadTimeline([
+  for (final c in comments)
+    BarrageItem(id: c.id, content: c.text, at: c.offset, type: BarrageType.scroll),
+]);
+
+// Drive it from the player's position; seeking replays both ways.
+controller.seekTo(player.position);
+controller.playbackRate = player.rate;   // 2× video = 2× comments
+
+// A recalled comment disappears everywhere it could still show up.
+controller.retractWhere((item) => item.id == recalledId);
+```
+
+Timed comments are exempt from `maxPendingAge` (their deadline is media time, not wall clock), and a loaded timeline counts as pending work, so the idle-paused engine wakes up in time for the next comment's moment.
 
 ### Extending Rendering
 

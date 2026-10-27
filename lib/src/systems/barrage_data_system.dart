@@ -65,6 +65,11 @@ class BarrageDataSystem extends Component {
   /// gallop cadence, meteor angle...). One shared Random: cheap and enough.
   final math.Random _fxRandom = math.Random();
 
+  /// Upper bound on dispatches per logic frame in realtime mode. Generous
+  /// enough that paced traffic never notices it, tight enough that a burst
+  /// cannot consume the frame it lands in.
+  static const int _realtimeDispatchCap = 8;
+
   bool get hasPending =>
       _waiting.isNotEmpty || _pausedBuffer.isNotEmpty || _timeline.hasUpcoming;
   int get pendingCount => _waiting.length + _pausedBuffer.length;
@@ -114,6 +119,9 @@ class BarrageDataSystem extends Component {
   }
 
   void pushMessage(BarrageItem item, {bool timed = false}) {
+    // A hidden type is rejected before it ever queues, so the waiting queue
+    // never fills with messages that would only be dropped at dispatch.
+    if (_ctx.config.isTypeHidden(item.type)) return;
     final pending = _PendingBarrage(
       item,
       DateTime.now().millisecondsSinceEpoch,
@@ -140,6 +148,12 @@ class BarrageDataSystem extends Component {
     _timeline.clear();
     _paused = false;
     _emitTimer = 0.0;
+    _relayoutQueue.clear();
+    _relayoutIndex = 0;
+    for (final render in _bakeQueue) {
+      render.bakeQueued = false;
+    }
+    _bakeQueue.clear();
   }
 
   /// Drops every message still waiting for a lane (or parked in the pause
@@ -156,15 +170,23 @@ class BarrageDataSystem extends Component {
 
   @override
   void update(double dt) {
+    _drainBakeQueue();
     _releaseDueTimelineItems();
-
+    _runScheduledRelayout();
     if (_ctx.config.realtimeMode) {
-      // Unthrottled: flush the whole waiting queue every logic frame, still
-      // bounded by maxVisibleCount and lane availability. Bursts appear the
-      // moment they arrive instead of trailing the pacing timer.
+      // Unthrottled: flush the waiting queue every logic frame, still bounded
+      // by maxVisibleCount and lane availability. Bursts appear the moment
+      // they arrive instead of trailing the pacing timer — but no more than
+      // [_realtimeDispatchCap] per frame: each dispatch lays out and records
+      // a message, and an unbounded flush of a large burst would spend the
+      // whole frame budget the moment the burst lands.
       final now = _ctx.clock.nowPrecise();
-      while (_waiting.isNotEmpty && _ctx.aliveCount < _ctx.config.maxVisibleCount) {
+      int dispatched = 0;
+      while (_waiting.isNotEmpty &&
+          _ctx.aliveCount < _ctx.config.maxVisibleCount &&
+          dispatched < _realtimeDispatchCap) {
         if (!_dispatchOne(now)) break;
+        dispatched++;
       }
     } else {
       _emitTimer += dt;
@@ -212,6 +234,12 @@ class BarrageDataSystem extends Component {
         wallNow - _waiting.first.enqueuedAtMs > maxAgeMs) {
       _waiting.removeFirst();
     }
+    // Drain messages whose type was hidden after they queued, so toggling a
+    // visibility filter does not leave a backlog that takes one emit slot
+    // each to disappear.
+    while (_waiting.isNotEmpty && _ctx.config.isTypeHidden(_waiting.first.item.type)) {
+      _waiting.removeFirst();
+    }
     if (_waiting.isEmpty) return false;
     if (_ctx.aliveCount >= _ctx.config.maxVisibleCount) return false;
     final item = _waiting.first.item;
@@ -247,8 +275,7 @@ class BarrageDataSystem extends Component {
     }
     track.lastLaunchTime = now.round();
     final cacheKey = buildCacheKey(item);
-    final CachedRender render =
-        _ctx.renderCache.acquire(cacheKey) ?? _storeRender(cacheKey, item, layoutResult);
+    final CachedRender render = _renderFor(cacheKey, item, layoutResult);
     double startX = _ctx.viewport.x;
     double startY =
         _ctx.topOffset +
@@ -316,58 +343,113 @@ class BarrageDataSystem extends Component {
     track.lockedUntil = entry.expireTime + 50;
   }
 
+  /// Entries still waiting for a scheduled relayout pass, snapshotted when the
+  /// pass was scheduled. Entries dispatched afterwards are laid out with the
+  /// current config already and never enter the queue.
+  final List<BarrageEntry> _relayoutQueue = <BarrageEntry>[];
+  int _relayoutIndex = 0;
+
+  /// How many queued entries one frame may re-lay out. A full-screen relayout
+  /// (shaping + picture recording per entry) done in a single frame overruns
+  /// the frame budget on low-end hardware — which is exactly when a host is
+  /// likely to be tuning the config live. The batch keeps the per-frame cost
+  /// bounded while the whole screen still restyles within a few frames.
+  static const int _relayoutBatchSize = 8;
+
+  /// Queues every on-screen message for a relayout against the current config,
+  /// spread across frames in [_relayoutBatchSize] chunks.
+  ///
+  /// Called from `updateConfig` for style/geometry changes; dragging a slider
+  /// then costs one bounded batch per frame instead of a full re-bake per
+  /// slider tick.
+  void scheduleRelayout() {
+    // A pass already in flight will cover the screen; restarting the snapshot
+    // mid-drag would keep re-doing the same head entries and never reach the
+    // tail.
+    if (_relayoutQueue.isNotEmpty) return;
+    _relayoutQueue.addAll(_ctx.activeEntries);
+    _relayoutIndex = 0;
+  }
+
+  void _runScheduledRelayout() {
+    if (_relayoutQueue.isEmpty) return;
+    int processed = 0;
+    while (_relayoutIndex < _relayoutQueue.length && processed < _relayoutBatchSize) {
+      final entry = _relayoutQueue[_relayoutIndex];
+      _relayoutIndex++;
+      // A null render means the entry was recycled since the snapshot: it is
+      // back in the pool (skip) or already re-dispatched with the new config
+      // (skip). Live entries always hold a render claim.
+      if (entry.render == null) continue;
+      _relayoutEntry(entry);
+      processed++;
+    }
+    if (_relayoutIndex >= _relayoutQueue.length) {
+      _relayoutQueue.clear();
+      _relayoutIndex = 0;
+    }
+  }
+
   /// Re-lays out and re-bakes every on-screen message against the current
-  /// config.
+  /// config in one synchronous pass.
   ///
   /// Called when a config change alters what on-screen messages look like or
   /// where they sit (font, colors, stroke, shadow, opacity, emoji size,
-  /// rasterization, lane geometry). Scrolling entries keep their x and keep
+  /// rasterization, lane geometry) while the loop is paused — a running loop
+  /// uses [scheduleRelayout] instead. Scrolling entries keep their x and keep
   /// travelling; pinned entries re-center under the new geometry. If the
   /// lane count shrank, entries are clamped onto the last available lane.
   /// The previous render artifact is handed back to the cache afterwards, so
   /// artifacts shared with other entries are never disposed out from under
   /// them.
   void relayoutActive() {
+    _relayoutQueue.clear();
+    _relayoutIndex = 0;
     final entries = _ctx.activeEntries;
     if (entries.isEmpty) return;
+    for (int i = 0; i < entries.length; i++) {
+      _relayoutEntry(entries[i]);
+    }
+  }
+
+  /// Rebuilds one entry against the current config in place.
+  void _relayoutEntry(BarrageEntry entry) {
+    // Motion-effect shows keep their own choreography; re-centering them
+    // here would fight the effect's path. They are short-lived, so simply
+    // leaving them untouched is fine.
+    if (entry.fx != null) return;
     final trackCount = _ctx.trackManager.tracks.length;
-    for (final entry in entries) {
-      // Motion-effect shows keep their own choreography; re-centering them
-      // here would fight the effect's path. They are short-lived, so simply
-      // leaving them untouched is fine.
-      if (entry.fx != null) continue;
-      final config = _resolveConfig(entry.item);
-      final fragments = _ctx.parser.parse(entry.item.content);
-      final layoutResult = _ctx.layout.layout(fragments, item: entry.item, config: config);
-      if (entry.track >= trackCount) entry.track = trackCount - 1;
-      final trackIndex = entry.track.clamp(0, trackCount - 1);
+    final config = _resolveConfig(entry.item);
+    final fragments = _ctx.parser.parse(entry.item.content);
+    final layoutResult = _ctx.layout.layout(fragments, item: entry.item, config: config);
+    if (entry.track >= trackCount) entry.track = trackCount - 1;
+    final trackIndex = entry.track.clamp(0, trackCount - 1);
 
-      final oldRender = entry.render;
-      final cacheKey = buildCacheKey(entry.item);
-      final render = _ctx.renderCache.acquire(cacheKey) ?? _storeRender(cacheKey, entry.item, layoutResult);
-      entry
-        ..width = layoutResult.width
-        ..height = layoutResult.height
-        ..render = render
-        ..picture = render.picture;
-      if (oldRender != null) {
-        _ctx.renderCache.release(oldRender);
-      }
+    final oldRender = entry.render;
+    final cacheKey = buildCacheKey(entry.item);
+    final render = _renderFor(cacheKey, entry.item, layoutResult);
+    entry
+      ..width = layoutResult.width
+      ..height = layoutResult.height
+      ..render = render
+      ..picture = render.picture;
+    if (oldRender != null) {
+      _ctx.renderCache.release(oldRender);
+    }
 
-      final double centerY = (config.trackHeight - layoutResult.height) / 2;
-      switch (entry.item.type) {
-        case BarrageType.bottomFixed:
-          entry.y = _ctx.viewport.y - _ctx.bottomOffset - ((trackIndex + 1) * config.trackHeight) + centerY;
-          entry.x = (_ctx.viewport.x - layoutResult.width) / 2;
-          break;
-        case BarrageType.topFixed:
-          entry.y = _ctx.topOffset + (trackIndex * config.trackHeight) + centerY;
-          entry.x = (_ctx.viewport.x - layoutResult.width) / 2;
-          break;
-        case BarrageType.scroll:
-          entry.y = _ctx.topOffset + (trackIndex * config.trackHeight) + centerY;
-          break;
-      }
+    final double centerY = (config.trackHeight - layoutResult.height) / 2;
+    switch (entry.item.type) {
+      case BarrageType.bottomFixed:
+        entry.y = _ctx.viewport.y - _ctx.bottomOffset - ((trackIndex + 1) * config.trackHeight) + centerY;
+        entry.x = (_ctx.viewport.x - layoutResult.width) / 2;
+        break;
+      case BarrageType.topFixed:
+        entry.y = _ctx.topOffset + (trackIndex * config.trackHeight) + centerY;
+        entry.x = (_ctx.viewport.x - layoutResult.width) / 2;
+        break;
+      case BarrageType.scroll:
+        entry.y = _ctx.topOffset + (trackIndex * config.trackHeight) + centerY;
+        break;
     }
   }
 
@@ -429,13 +511,65 @@ class BarrageDataSystem extends Component {
   /// keep using the vector recording instead of vanishing.
   static const double _maxRasterDimension = 4096.0;
 
-  /// Builds and caches the render for [layoutResult]. The returned reference is
-  /// owned by the caller and must be handed to the motion system's release with
-  /// its barrage.
-  CachedRender _storeRender(String cacheKey, BarrageItem item, LayoutResult layoutResult) {
-    final render = CachedRender(picture: _ctx.renderer.buildPicture(layoutResult));
-    _bakeRender(render, layoutResult.width, layoutResult.height);
-    return _ctx.renderCache.put(cacheKey, render);
+  /// How many deferred bitmaps one frame may bake. Baking a message records a
+  /// device-scaled copy of its picture and rasterizes it (`toImageSync`) —
+  /// raster-thread work that lands inside the frame that first draws it. A
+  /// burst or a config-drag restyle used to bake dozens of bitmaps in one
+  /// frame; with the budget the same work spreads over a few frames while the
+  /// not-yet-baked messages draw through their (already styled) vector
+  /// recording.
+  static const int _bakeBudgetPerFrame = 8;
+
+  /// Renders waiting to be baked, oldest first.
+  final Queue<CachedRender> _bakeQueue = Queue<CachedRender>();
+
+  /// Acquires (or builds and stores) the render for a message, and queues it
+  /// for baking when it has no bitmap yet. The returned reference is owned by
+  /// the caller and must be handed to the motion system's release with its
+  /// barrage.
+  CachedRender _renderFor(String cacheKey, BarrageItem item, LayoutResult layoutResult) {
+    final cached = _ctx.renderCache.acquire(cacheKey);
+    if (cached != null) {
+      _enqueueBake(cached);
+      return cached;
+    }
+    final render = CachedRender(picture: _ctx.renderer.buildPicture(layoutResult))
+      ..contentWidth = layoutResult.width
+      ..contentHeight = layoutResult.height;
+    final stored = _ctx.renderCache.put(cacheKey, render);
+    _enqueueBake(stored);
+    return stored;
+  }
+
+  void _enqueueBake(CachedRender render) {
+    if (!_ctx.config.rasterizeItems || !_ctx.renderCache.rasterizationSupported) return;
+    if (render.bakeQueued || render.isDisposed || render.hasImage) return;
+    render.bakeQueued = true;
+    _bakeQueue.add(render);
+  }
+
+  /// Bakes up to [_bakeBudgetPerFrame] queued renders. Runs before dispatch
+  /// each frame so freshly baked bitmaps are blitted the same frame.
+  void _drainBakeQueue() {
+    if (_bakeQueue.isEmpty) return;
+    if (!_ctx.config.rasterizeItems || !_ctx.renderCache.rasterizationSupported) {
+      for (final render in _bakeQueue) {
+        render.bakeQueued = false;
+      }
+      _bakeQueue.clear();
+      return;
+    }
+    int budget = _bakeBudgetPerFrame;
+    while (budget > 0 && _bakeQueue.isNotEmpty) {
+      final render = _bakeQueue.removeFirst();
+      render.bakeQueued = false;
+      // The render may have been evicted and disposed while queued (message
+      // scrolled off, cache trimmed); there is nothing left to bake.
+      if (render.isDisposed || render.hasImage) continue;
+      _bakeRender(render, render.contentWidth, render.contentHeight);
+      _ctx.renderCache.accountBytes(render);
+      budget--;
+    }
   }
 
   /// Rasterizes [render] once so display frames only have to blit it.

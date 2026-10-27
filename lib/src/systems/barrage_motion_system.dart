@@ -100,8 +100,13 @@ class BarrageMotionSystem extends Component {
       final entry = entries[i];
       if (!predicate(entry.item)) continue;
       // Same order as the expiry path: drop the lane claim first, then the
-      // bitmap/pool claim.
-      if (entry.fx != null) _releaseLaneLock(entry);
+      // bitmap/pool claim. A retracted pinned message frees its lane now
+      // instead of leaving it reserved until the old expiry.
+      if (entry.fx != null) {
+        _releaseLaneLock(entry);
+      } else if (entry.item.type != BarrageType.scroll) {
+        _releaseFixedLock(entry);
+      }
       _release(entry);
       final last = entries.length - 1;
       entries[i] = entries[last];
@@ -126,6 +131,52 @@ class BarrageMotionSystem extends Component {
     if (identical(track.lastEntry, entry)) {
       track.lastEntry = null;
       track.lastRight = 0.0;
+    }
+  }
+
+  /// Same contract as [_releaseLaneLock] for a fixed (top/bottom) entry: the
+  /// lane was locked until this entry's expiry, and retiring the entry early
+  /// must not leave the lane reserved until that deadline.
+  void _releaseFixedLock(BarrageEntry entry) {
+    final tracks = _ctx.trackManager.tracks;
+    final index = entry.track;
+    if (index < 0 || index >= tracks.length) return;
+    final track = tracks[index];
+    if (track.locked && track.lockedUntil == entry.expireTime) {
+      track.locked = false;
+      track.lockedUntil = 0;
+    }
+    if (identical(track.lastEntry, entry)) {
+      track.lastEntry = null;
+      track.lastRight = 0.0;
+    }
+  }
+
+  /// Removes every entry matching [test] from the screen in one pass —
+  /// render claim released, lane lock freed, entry recycled. Used when a
+  /// config change (for example a visibility filter) must retire on-screen
+  /// messages immediately instead of waiting for them to expire.
+  void retireWhere(bool Function(BarrageEntry entry) test) {
+    final entries = _ctx.activeEntries;
+    int len = entries.length;
+    int i = 0;
+    while (i < len) {
+      final entry = entries[i];
+      if (!test(entry)) {
+        i++;
+        continue;
+      }
+      if (entry.fx != null) {
+        _releaseLaneLock(entry);
+      } else if (entry.item.type != BarrageType.scroll) {
+        _releaseFixedLock(entry);
+      }
+      _release(entry);
+      // Tail swap, mirroring the in-frame recycle path; the moved element is
+      // re-examined at the same index.
+      len--;
+      entries[i] = entries[len];
+      entries.length = len;
     }
   }
 

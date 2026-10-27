@@ -18,7 +18,7 @@ class MixedLayout {
       _textCache = TextCache(maxSize: maxTextCacheSize);
 
   final EmojiAtlas atlas;
-  TextCache _textCache;
+  final TextCache _textCache;
   final LinkedHashMap<int, LayoutResult> _cache = LinkedHashMap<int, LayoutResult>();
   int _maxLayoutCacheSize;
   final List<LayoutSpan> _reusableSpans = [];
@@ -27,11 +27,15 @@ class MixedLayout {
 
   void updateMaxTextCacheSize(int newSize) {
     final normalizedSize = newSize.clamp(1, 10000).toInt();
-    if (_textCache.maxSize == normalizedSize && _maxLayoutCacheSize == normalizedSize) return;
-    _disposeCachedParagraphs();
-    final newCache = TextCache(maxSize: normalizedSize);
-    _textCache = newCache;
+    if (_maxLayoutCacheSize == normalizedSize) return;
     _maxLayoutCacheSize = normalizedSize;
+    _textCache.setMaxSize(normalizedSize);
+    // Shrink the layout cache too: its eviction path is what disposes
+    // paragraphs nothing references anymore.
+    while (_cache.length > _maxLayoutCacheSize) {
+      final evicted = _cache.remove(_cache.keys.first);
+      if (evicted != null) _disposeParagraphsReleasedBy(evicted);
+    }
   }
 
   void clearCache() {

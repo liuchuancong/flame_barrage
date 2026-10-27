@@ -3,10 +3,27 @@ import 'dart:ui' as ui;
 class TextCache {
   TextCache({this.maxSize = 1000});
 
-  final int maxSize;
+  int maxSize;
   final Map<String, ui.Paragraph> _cache = {};
 
   int get size => _cache.length;
+
+  /// Adjusts the capacity in place, evicting LRU paragraphs when it shrinks.
+  ///
+  /// Evicted paragraphs are only dropped from the map, never disposed here:
+  /// they may still be referenced by cached layout results, which own their
+  /// lifetime and dispose them once the last reference goes away. Rebuilding
+  /// the whole cache on a limit change (the previous behavior) discarded
+  /// every warm paragraph and forced a full re-shape of the next frame's
+  /// messages — visible as a hitch while the budget slider was dragged.
+  void setMaxSize(int value) {
+    if (value <= 0) return;
+    if (value == maxSize) return;
+    maxSize = value;
+    while (_cache.length > maxSize) {
+      _cache.remove(_cache.keys.first);
+    }
+  }
 
   bool contains(String key) => _cache.containsKey(key);
 
