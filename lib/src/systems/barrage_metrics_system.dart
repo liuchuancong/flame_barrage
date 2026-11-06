@@ -3,15 +3,17 @@ import 'package:flame/components.dart';
 import '../model/barrage/barrage_entry.dart';
 import '../core/barrage_context.dart';
 
-/// Aggregates per-lane metrics at roughly 30 Hz for the lane allocator and
-/// the speed strategy.
+/// Aggregates per-lane metrics at roughly 30 Hz for observability and to
+/// refresh lane edges after a restyle.
 ///
-/// Read-only pass: it never mutates entries. For each lane it recomputes the
-/// live count, mean scroll speed, rough occupancy and the right edge of the
-/// youngest entry — the numbers lane allocation weighs when picking a lane.
-/// Lanes pinned by a fixed message stay locked until that message expires.
+/// Read-only pass: it never mutates entries. Allocation reads the live
+/// per-lane entry list directly, so a launch never waits for this tick. For
+/// each lane it recomputes the live count, mean scroll speed, rough occupancy
+/// and the right edge of the youngest entry. Lanes pinned by a fixed message
+/// stay locked until that message expires.
 class BarrageMetricsSystem extends Component {
-  BarrageMetricsSystem(this._ctx, {int priority = 300}) : super(priority: priority);
+  BarrageMetricsSystem(this._ctx, {int priority = 300})
+    : super(priority: priority);
 
   final BarrageContext _ctx;
   double _timer = 0.0;

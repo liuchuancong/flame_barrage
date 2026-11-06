@@ -85,6 +85,7 @@ export 'src/render/barrage/mixed_renderer.dart';
 export 'src/render/base_renderer.dart';
 
 // scheduler
+export 'src/scheduler/scroll_timing.dart';
 export 'src/scheduler/speed_strategy.dart';
 export 'src/scheduler/track_allocator.dart';
 export 'src/scheduler/track_manager.dart';
@@ -99,6 +100,7 @@ export 'src/systems/barrage_render_system.dart';
 export 'src/util/barrage_logger.dart';
 export 'src/util/color_util.dart';
 export 'src/util/fps_monitor.dart';
+export 'src/util/frame_timings_monitor.dart';
 export 'src/util/measure.dart';
 
 // widget

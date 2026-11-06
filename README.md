@@ -85,7 +85,7 @@ Text outlines and fills are rendered as independent paragraphs, avoiding font-ca
 `updateConfig` applies changes without clearing the screen, and every change reaches what is already on screen:
 
 - Style / lane-geometry changes re-lay out every visible message: scrolling messages keep their position, pinned messages re-center under the new lane geometry. The restyle runs in bounded per-frame batches, so dragging a slider live never overruns a frame budget.
-- A `baseSpeed` change rescales the entries already scrolling (a uniform factor, so gaps and the no-catch-up ordering are preserved).
+- A `baseSpeed` / `speedMode` / `speedPlus` change recomputes the speed of entries already scrolling: `speedPlus` is a uniform factor (gaps and the no-catch-up ordering are preserved); switching mode re-derives each entry's speed from its own width.
 - A `fixedDuration` change re-expires pinned messages from their own spawn time and moves the lane-lock deadline with them.
 - `hideTop` / `hideBottom` / `hideScroll` visibility filters drop hidden messages at `send` time and retire whatever of that type is already on screen the moment the filter is toggled — lane locks included.
 - Messages with per-item overrides (`BarrageItem.baseSpeed`, `fixedDuration`, …) keep their own values.
@@ -96,9 +96,13 @@ Text outlines and fills are rendered as independent paragraphs, avoiding font-ca
 - **Playback-rate aware:** the timeline is driven by the engine's logic clock, so `playbackRate = 2.0` (normally mirroring the video) speeds the comments up with it.
 - **Host-side retraction:** `controller.retractWhere((item) => item.id == recalledId)` takes a recalled chat message back off the screen — and out of the queue and the not-yet-released timeline — returning how many the viewer could have seen.
 
-### 🎯 Frame-Rate Independent Motion
+### 🎯 Display-Synced Scrolling
 
-Positions integrate against a sub-millisecond logic clock using the real elapsed time of each frame — velocity never depends on frame load or clamped step durations. Uniform scrolling at 60/120/144 Hz panels, with lane conflict avoidance and safe-gap control.
+`fps` defaults to `0`, so logic steps follow the display refresh rate: a 75 Hz panel advances on 75 steps instead of being quantised to 60 Hz. Positions still integrate against the sub-millisecond logic clock using each frame's real elapsed time, so velocity never depends on frame load.
+
+Scroll speed uses adaptive timing by default: the viewport width selects a 4.5–22 s crossing window, and speed is `(viewport + textWidth) / duration × speedPlus`. Wide messages stay longer and narrow ones move faster, giving a live-player rhythm. Set `speedMode: BarrageSpeedMode.fixed` for the old constant speed.
+
+Lane allocation now reads a live per-lane entry list kept in sync on dispatch and recycle. A new message checks the rightmost tail's safe gap, prefers the lane with the most clearance, and fills empty lanes least-recently-used instead of top-down only. `SpeedStrategy` still caps a follower that would catch its leader.
 
 ### ⏩ Playback Rate & Realtime Dispatch
 
@@ -112,7 +116,7 @@ Positions integrate against a sub-millisecond logic clock using the real elapsed
 ```yaml
 dependencies:
   flame: ^1.38.2
-  flame_barrage: ^0.0.10
+  flame_barrage: ^0.0.11
 ```
 
 ---
@@ -287,11 +291,14 @@ All engine tuning. Every field is hot-appliable via `copyWith`; style and lane-g
 | | `trackHeight` | `double` / 36 | Lane height (auto-floored to fontSize+10) |
 | | `topAreaDistance` / `bottomAreaDistance` | 0 / 0 | Extra insets beyond the safe area |
 | | `safeArea` | `bool` / true | Respect `MediaQuery` insets |
-| Timing & speed | `fps` | `int` / 60 | Logic-step ceiling; display refresh bounds it in practice |
+| Timing & speed | `fps` | `int` / 0 | Logic steps; `0` follows the display refresh, a positive value caps it for low-power devices |
 | | `fixedDuration` | `Duration` / 4s | Dwell time for pinned messages |
-| | `baseSpeed` | `double` / 120 | Scroll speed in px/s |
+| | `baseSpeed` | `double` / 120 | Fixed-mode scroll speed in px/s |
+| | `speedMode` | `BarrageSpeedMode` / adaptive | `adaptive` derives crossing time from viewport and text width; `fixed` uses `baseSpeed` |
+| | `speedPlus` | `double` / 1.0 | Scroll speed multiplier |
 | Dispatch | `emitInterval` | `double` / 0.1 | Seconds between paced dispatches |
 | | `realtimeMode` | `bool` / false | Bypass pacing; flush the queue every logic frame (capped at 8 dispatches per frame so a burst cannot blow the frame it lands in) |
+| | `maxDispatchPerSecond` | `int` / 60 | Realtime-mode token bucket; spreads a burst across frames; `0` disables |
 | | `maxVisibleCount` | `int` / 80 | On-screen message cap |
 | | `maxPendingCount` | `int` / 120 | Queue cap (oldest dropped beyond it) |
 | | `maxPendingAge` | `Duration` / 5s | Drop messages older than this before dispatch (timed VOD comments are exempt) |
@@ -489,6 +496,7 @@ final emojis = const EmojiProtocol().parseRegistryJson(rawList);    // List<Emoj
 | Class | Members | Purpose |
 | --- | --- | --- |
 | `FpsMonitor` | `start(callback)`, `stop()` | Real display-frame FPS sampling over a sliding window |
+| `FrameTimingsMonitor` | `start(callback)`, `stop()` | Per-second UI build / raster / vsync / total timings and jank frames |
 | `Measure` | `Measure.profile(label, action)` | Times a closure, warns above 1 ms |
 | `ColorUtil` | `fromHex`, `fromInt`, `toARGB32` | Color conversions |
 | `BarrageLogger` | `d/w/e` | Tagged logging used across the engine |
@@ -515,15 +523,25 @@ Exported for custom hosting or experimentation:
 
 | Setting | Recommendation | Why |
 | --- | --- | --- |
-| `fps` | Set it to the panel's refresh rate (60 or 120) | The engine can never step more often than the display refreshes. Setting `fps: 144` on a 60 Hz TV changes nothing — if frames still drop, the cost per frame is the problem, not the target rate. |
+| `fps` | Keep the default `0` (follow refresh); use 60 on a low-power device | `0` steps every frame on 75/120/144 Hz panels instead of beating against the refresh rate; a positive value is a deliberate cap. |
 | `rasterizeItems` | `true` (default) | Removes per-frame text, stroke and shadow rasterization. |
 | `maxVisibleCount` | 40–80 on a weak GPU | This is the number of bitmap blits per frame. |
 | `showStroke` | Keep `true` if the text sits on bright video; disable if the bake cost itself shows up as a startup spike | The outline is rasterized once per message rather than per frame. |
 | `trackHeight` / `area` | A full screen of lanes only helps if the GPU can fill it | Fewer lanes means fewer messages on screen at once. |
 | `pictureCacheMaxSize` / `rasterCacheMaxBytes` | Fit the bitmap budget to the device | Caps the GPU memory the cache may hold (`rasterCacheBytes` reports live usage). |
-| `emitInterval` | `0.1` for a calm stream, `0.02`–`0.05` for a busy one | Paces how many new messages are shaped and baked per second. Set `realtimeMode: true` instead when latency matters more than density. |
+| `emitInterval` | `0.1` for a calm stream, `0.02`–`0.05` for a busy one | Paces how many new messages are shaped and baked per second. Set `realtimeMode: true` instead when latency matters more than density, and bound bursts with `maxDispatchPerSecond`. |
 
 Calling `controller.clear()` (or disposing `FlameBarrageWidget`) stops the game loop entirely, so a paused room costs nothing.
+
+### Locating dropped frames
+
+Start with `FrameTimingsMonitor` and read the UI / raster split every second:
+
+- **High UI build time**: lower `maxVisibleCount` to ~80 first, make sure the host does not pass a new `BarrageConfig` instance on every rebuild, then check whether `emitInterval` / `realtimeMode` is bunching layout into one frame.
+- **High raster time**: reduce the number of bitmap textures (`rasterizeItems`, `maxVisibleCount`) and watch `rasterCacheBytes`; many independently sized `ui.Image` objects mean more texture switches and uploads. On desktop, try disabling `rasterizeItems` to compare the vector path.
+- **Both low but FPS low**: the bottleneck is usually host composition — video texture, PlatformView, other animations in the same layer, or vsync alignment — not the barrage frame cost. Isolate the barrage and video with separate `RepaintBoundary`s and confirm the host is not rebuilding the whole page every frame.
+
+`jankFrames` is measured against the current display's refresh budget. It does not replace `flutter run --profile` plus the DevTools frame chart, but it shows the UI/raster split inside a release or desktop build.
 
 ---
 

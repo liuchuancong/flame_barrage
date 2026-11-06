@@ -77,7 +77,7 @@ FlameBarrage Engine 是一个基于 Flame 图形框架打造的高性能、硬�
 `updateConfig` 无需清屏，且每一类修改都会作用到已经在屏的弹幕：
 
 - 样式 / 轨道几何修改会让所有可见弹幕重新排版：滚动弹幕保持当前位置继续滚动，固定弹幕按新轨道几何重新居中。重排按帧批量执行（每帧限额），实时拖滑块也不会击穿帧预算。
-- `baseSpeed` 变更对正在滚动的弹幕按统一比例缩放（前后车间距与防追尾排序保持不变）。
+- `baseSpeed` / `speedMode` / `speedPlus` 变更对正在滚动的弹幕重新计算速度：`speedPlus` 是统一倍率，前后车间距与防追尾排序保持不变；切换模式时按每条弹幕自己的宽度重新取值。
 - `fixedDuration` 变更从每条固定弹幕自己的入场时间重算到期时刻，轨道锁期限同步跟随。
 - `hideTop` / `hideBottom` / `hideScroll` 可见性过滤：隐藏类型在 `send` 时直接拒收，开关打开的瞬间屏上该类型弹幕即时下屏（含轨道锁释放）。
 - 带单条覆写（`BarrageItem.baseSpeed`、`fixedDuration` 等）的弹幕保持自己的值。
@@ -88,9 +88,13 @@ FlameBarrage Engine 是一个基于 Flame 图形框架打造的高性能、硬�
 - **跟随倍速**：时间轴由引擎逻辑时钟驱动，`playbackRate = 2.0`（通常镜像视频倍速）时评论同步 2 倍速。
 - **宿主侧撤回**：`controller.retractWhere((item) => item.id == recalledId)` 把被召回的聊天消息从屏幕、队列与尚未释放的时间轴中一并取回，返回观众可能已看到的条数。
 
-### 🎯 帧率无关的匀速运动
+### 🎯 显示刷新率同步的滚动
 
-滚动位移基于亚毫秒精度的逻辑时钟、按每帧真实流逝时间积分——速度不依赖帧负载，也没有按时长截断带来的忽快忽慢。60/120/144Hz 面板下均保持匀速，带轨道冲突规避与安全间距控制。
+`fps` 默认 `0`，逻辑步进跟随显示器刷新率——75Hz 面板就按 75 步推进，不再被限制在 60Hz 与屏幕刷新率错拍。位移仍基于亚毫秒逻辑时钟、按每帧真实流逝时间积分，速度不依赖帧负载。
+
+滚动速度默认采用自适应时长模型：按视口宽度查表得到 4.5–22 秒的过屏时间，再按 `(视口宽 + 文本宽) / 时长 × speedPlus` 求速度，宽弹幕停留更久、窄弹幕更快，整体节奏更接近直播播放器。需要旧的固定速度时设 `speedMode: BarrageSpeedMode.fixed`。
+
+轨道分配改为读取每条轨道**实时维护的在屏条目列表**：新消息进入前检查最右条目的尾边安全间距，优先选择余量最大的轨道；空轨道按最久未发射轮转，避免洪峰时全挤在顶部。`SpeedStrategy` 仍会对可能追上前面弹幕的新消息降速，保持不追尾。
 
 ### 🐎 座驾特效弹幕
 
@@ -108,7 +112,7 @@ FlameBarrage Engine 是一个基于 Flame 图形框架打造的高性能、硬�
 ```yaml
 dependencies:
   flame: ^1.38.2
-  flame_barrage: ^0.0.10
+  flame_barrage: ^0.0.11
 ```
 
 ---
@@ -283,11 +287,14 @@ engine.context;                     // 进阶：共享 BarrageContext
 | | `trackHeight` | `double` / 36 | 轨道高度（自动下限 fontSize+10） |
 | | `topAreaDistance` / `bottomAreaDistance` | 0 / 0 | 安全区之外的额外留白 |
 | | `safeArea` | `bool` / true | 适配 `MediaQuery` 安全区 |
-| 时间与速度 | `fps` | `int` / 60 | 逻辑步进上限；实际受屏幕刷新率约束 |
+| 时间与速度 | `fps` | `int` / 0 | 逻辑步进；`0` 跟随显示器刷新率，正数表示低功耗上限 |
 | | `fixedDuration` | `Duration` / 4s | 固定弹幕驻留时长 |
-| | `baseSpeed` | `double` / 120 | 滚动速度（px/s） |
+| | `baseSpeed` | `double` / 120 | 固定模式下的滚动速度（px/s） |
+| | `speedMode` | `BarrageSpeedMode` / adaptive | `adaptive` 按屏宽/文本宽计算过屏时长；`fixed` 使用 `baseSpeed` |
+| | `speedPlus` | `double` / 1.0 | 滚动速度倍率 |
 | 派发 | `emitInterval` | `double` / 0.1 | 节流派发间隔（秒） |
 | | `realtimeMode` | `bool` / false | 关闭节流，每逻辑帧整队上屏（每帧最多派发 8 条，洪峰不会击穿落地当帧） |
+| | `maxDispatchPerSecond` | `int` / 60 | `realtimeMode` 下每秒派发预算（令牌桶），把洪峰摊到后续帧；`0` 关闭 |
 | | `maxVisibleCount` | `int` / 80 | 同屏弹幕上限 |
 | | `maxPendingCount` | `int` / 120 | 等待队列上限（超出丢弃最旧） |
 | | `maxPendingAge` | `Duration` / 5s | 上屏前超龄消息直接丢弃（点播定时评论豁免） |
@@ -485,6 +492,7 @@ final emojis = const EmojiProtocol().parseRegistryJson(rawList);    // List<Emoj
 | 类 | 成员 | 用途 |
 | --- | --- | --- |
 | `FpsMonitor` | `start(callback)`、`stop()` | 基于滑动窗口的真实显示帧率采样 |
+| `FrameTimingsMonitor` | `start(callback)`、`stop()` | 每秒输出 UI 构建、raster、vsync、总耗时与 jank 帧数 |
 | `Measure` | `Measure.profile(label, action)` | 计时闭包执行，超过 1ms 输出告警 |
 | `ColorUtil` | `fromHex`、`fromInt`、`toARGB32` | 颜色转换 |
 | `BarrageLogger` | `d/w/e` | 引擎统一使用的带标签日志 |
@@ -511,15 +519,25 @@ final emojis = const EmojiProtocol().parseRegistryJson(rawList);    // List<Emoj
 
 | 参数 | 建议 | 原因 |
 | --- | --- | --- |
-| `fps` | 设为屏幕实际刷新率（60 / 120） | 引擎每帧最多推进一次，不可能超过屏幕刷新率。60Hz 电视上设 `fps: 144` 不会有任何提升——如果仍然掉帧，问题在单帧成本而不在目标帧率。 |
+| `fps` | 保持默认 `0`（跟随刷新率）；低端设备可设为 60 | `0` 让 75/120/144Hz 面板每帧都推进，不会出现 60Hz 逻辑与高刷屏错拍；正数才是有意的降载上限。 |
 | `rasterizeItems` | `true`（默认） | 消除逐帧的文字/描边/阴影光栅化。 |
 | `maxVisibleCount` | 弱 GPU 上 40–80 | 这个值就是每帧位图 blit 的次数。 |
 | `showStroke` | 亮色视频上建议保留；若烘焙本身带来启动尖峰可关闭 | 描边每条弹幕只光栅化一次，不再是逐帧成本。 |
 | `trackHeight` / `area` | 轨道越多，同屏弹幕越多，量力而行 | 减少同屏数量是最直接的降载手段。 |
 | `pictureCacheMaxSize` / `rasterCacheMaxBytes` | 按设备显存设定 | 限制位图缓存占用的显存（`rasterCacheBytes` 可观察实时占用）。 |
-| `emitInterval` | 平稳直播用 `0.1`，高峰用 `0.02`–`0.05` | 控制每秒新增弹幕的排版与烘焙节奏。更在意时效时可改用 `realtimeMode: true`。 |
+| `emitInterval` | 平稳直播用 `0.1`，高峰用 `0.02`–`0.05` | 控制每秒新增弹幕的排版与烘焙节奏。更在意时效时可改用 `realtimeMode: true`，并用 `maxDispatchPerSecond` 限制洪峰。 |
 
 调用 `controller.clear()`（或 `FlameBarrageWidget` 被 dispose）会彻底停止游戏循环，静默房间零开销。
+
+### 掉帧定位
+
+先用 `FrameTimingsMonitor` 看每秒的 UI / raster 耗时：
+
+- **UI 构建耗时高**：先把 `maxVisibleCount` 降到 80 左右，确认没有每次宿主 rebuild 都传入新的 `BarrageConfig`；再检查 `emitInterval` / `realtimeMode` 是否让排版集中在同一帧。
+- **raster 耗时高**：减少位图纹理数量（`rasterizeItems`、`maxVisibleCount`），观察 `rasterCacheBytes`；不同尺寸的独立 `ui.Image` 越多，纹理切换和上传越贵。桌面端可以关闭 `rasterizeItems` 对比矢量路径。
+- **两者都低但 FPS 低**：瓶颈通常不在弹幕引擎，而在宿主合成：视频纹理、PlatformView、同层其他动画或 vsync 对齐。把弹幕层和视频层分别用 `RepaintBoundary` 隔离，再确认宿主没有在每帧重建整棵页面。
+
+`FrameTimingsMonitor` 的窗口内 `jankFrames` 以当前显示器刷新预算判定；它不替代 `flutter run --profile` + DevTools 的帧图表，但能在真机/桌面包内直接看到 UI 与 raster 的归属。
 
 ---
 

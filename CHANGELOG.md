@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
+## 0.0.11
+
+### Changed - Display-synced flow and adaptive scroll timing
+
+- **`fps` defaults to `0`.** Logic steps follow the display refresh rate: a 75 Hz or 144 Hz panel now advances motion on every frame instead of being quantised to the 60 Hz logic gate while the canvas repaints at the display rate. Set a positive `fps` only for a deliberate low-power cap.
+- **Adaptive scroll timing is the default.** `speedMode: BarrageSpeedMode.adaptive` uses a viewport-width duration table: the viewport width selects a 4.5–22 s crossing window, and speed is `(viewport + textWidth) / duration × speedPlus`. Wide messages stay longer and narrow ones move faster. `BarrageSpeedMode.fixed` restores the old constant `baseSpeed`; per-message `BarrageItem.baseSpeed` still overrides both.
+- **Live lane allocation.** `BarrageTrack` now owns the live entries in its lane. Dispatch and recycle keep the right edge current immediately instead of waiting for the ~30 Hz metrics pass; allocation prefers the lane with the most clearance and fills empty lanes least-recently-used instead of only top-down.
+- **Realtime dispatch budget.** `maxDispatchPerSecond` (default 60, `0` disables) is a token bucket for `realtimeMode`: a burst appears over successive frames instead of up to eight messages in the landing frame.
+
+### Added
+
+- `ScrollTiming` (exported) exposes the duration/speed helpers for hosts that want to match their own HUD or timing.
+- `FrameTimingsMonitor` reports UI build, raster, vsync and jank frames once per second, so a dropped frame can be attributed to the engine or the host composition.
+- Scheduler tests covering the duration table, catch-up cap, lane clearance and live track entry bookkeeping.
+
 ## 0.0.9
 
 ### Added - VOD timelines: comments dispatched by media time

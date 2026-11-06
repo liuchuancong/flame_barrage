@@ -10,14 +10,16 @@ class SpeedStrategy {
     double screenWidth,
     BarrageConfig config, {
     required BarrageTrack targetTrack,
+    double? candidateSpeed,
   }) {
+    final desired = candidateSpeed ?? config.baseSpeed;
     final last = targetTrack.lastEntry;
     if (last == null) {
-      return config.baseSpeed;
+      return desired;
     }
 
-    if (config.baseSpeed <= last.speed) {
-      return config.baseSpeed;
+    if (desired <= last.speed) {
+      return desired;
     }
 
     final double lastRight = targetTrack.lastRight;
@@ -25,14 +27,15 @@ class SpeedStrategy {
     final double lastRemainingTime = lastRight / last.speed;
 
     if (lastRemainingTime <= 0) {
-      return config.baseSpeed;
+      return desired;
     }
 
-    final double maxAllowedSpeed = last.speed + (catchUpDistance / lastRemainingTime);
-    if (config.baseSpeed > maxAllowedSpeed) {
+    final double maxAllowedSpeed =
+        last.speed + (catchUpDistance / lastRemainingTime);
+    if (desired > maxAllowedSpeed) {
       return last.speed * 0.95;
     }
 
-    return config.baseSpeed;
+    return desired;
   }
 }

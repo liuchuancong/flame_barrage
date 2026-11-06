@@ -3,13 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flame_barrage/flame_barrage.dart';
 
 class BarrageConfigPanelScreen extends StatefulWidget {
-  const BarrageConfigPanelScreen({super.key, required this.initialConfig, required this.onConfigChanged});
+  const BarrageConfigPanelScreen({
+    super.key,
+    required this.initialConfig,
+    required this.onConfigChanged,
+  });
 
   final BarrageConfig initialConfig;
   final ValueChanged<BarrageConfig> onConfigChanged;
 
   @override
-  State<BarrageConfigPanelScreen> createState() => _BarrageConfigPanelScreenState();
+  State<BarrageConfigPanelScreen> createState() =>
+      _BarrageConfigPanelScreenState();
 }
 
 class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
@@ -45,8 +50,11 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
   double _bottomAreaDistance = 0;
   Duration _fixedDuration = Duration(seconds: 4);
   bool _safeArea = true;
-  int _fps = 60;
+  int _fps = 0;
   double _baseSpeed = 120.0;
+  BarrageSpeedMode _speedMode = BarrageSpeedMode.adaptive;
+  double _speedPlus = 1.0;
+  int _maxDispatchPerSecond = 60;
 
   @override
   void initState() {
@@ -74,6 +82,9 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
     _emitInterval = config.emitInterval;
     _realtimeMode = config.realtimeMode;
     _baseSpeed = config.baseSpeed;
+    _speedMode = config.speedMode;
+    _speedPlus = config.speedPlus;
+    _maxDispatchPerSecond = config.maxDispatchPerSecond;
     _overlapSafeGap = config.overlapSafeGap;
     _noEmojiMode = config.noEmojiMode;
     _barragePoolMaxSize = config.barragePoolMaxSize;
@@ -105,6 +116,9 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
       emitInterval: _emitInterval,
       realtimeMode: _realtimeMode,
       baseSpeed: _baseSpeed,
+      speedMode: _speedMode,
+      speedPlus: _speedPlus,
+      maxDispatchPerSecond: _maxDispatchPerSecond,
       overlapSafeGap: _overlapSafeGap,
       noEmojiMode: _noEmojiMode,
       barragePoolMaxSize: _barragePoolMaxSize,
@@ -126,7 +140,11 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
 
     _controller.updateConfig(updatedConfig);
     widget.onConfigChanged(updatedConfig);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Config reloaded and applied to the render pipeline!')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Config reloaded and applied to the render pipeline!'),
+      ),
+    );
   }
 
   @override
@@ -171,16 +189,23 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orangeAccent,
                 foregroundColor: Colors.black,
                 minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               icon: const Icon(Icons.rocket_launch_rounded, size: 20),
-              label: Text('Send a verification barrage (fontSize: ${_fontSize.toInt()}px)'),
+              label: Text(
+                'Send a verification barrage (fontSize: ${_fontSize.toInt()}px)',
+              ),
               onPressed: () {
                 _floodIndex++;
                 _controller.send(
@@ -312,8 +337,29 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                     _pushLiveUpdate();
                   }),
                 ),
+                _buildSwitchSetting(
+                  'Adaptive scroll timing (speedMode · viewport duration table)',
+                  _speedMode == BarrageSpeedMode.adaptive,
+                  (v) => setState(() {
+                    _speedMode = v
+                        ? BarrageSpeedMode.adaptive
+                        : BarrageSpeedMode.fixed;
+                    _pushLiveUpdate();
+                  }),
+                ),
                 _buildSliderSetting(
-                  'Base speed (baseSpeed)',
+                  'Speed multiplier (speedPlus)',
+                  _speedPlus,
+                  0.5,
+                  2.0,
+                  0.05,
+                  (v) => setState(() {
+                    _speedPlus = v;
+                    _pushLiveUpdate();
+                  }),
+                ),
+                _buildSliderSetting(
+                  'Base speed, fixed mode only (baseSpeed)',
                   _baseSpeed,
                   10.0,
                   500.0,
@@ -324,10 +370,10 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   }),
                 ),
                 _buildSliderSetting(
-                  'Frame rate (fps)',
+                  'Logic FPS (fps · 0 = follow display refresh)',
                   _fps.toDouble(),
-                  30,
-                  120,
+                  0,
+                  144,
                   1,
                   (v) => setState(() {
                     _fps = v.toInt();
@@ -367,6 +413,17 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
                   _realtimeMode,
                   (v) => setState(() {
                     _realtimeMode = v;
+                    _pushLiveUpdate();
+                  }),
+                ),
+                _buildSliderSetting(
+                  'Realtime dispatch cap /s (maxDispatchPerSecond · 0 = off)',
+                  _maxDispatchPerSecond.toDouble(),
+                  0,
+                  120,
+                  5,
+                  (v) => setState(() {
+                    _maxDispatchPerSecond = v.toInt();
                     _pushLiveUpdate();
                   }),
                 ),
@@ -485,7 +542,11 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Text(
         title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orangeAccent),
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.orangeAccent,
+        ),
       ),
     );
   }
@@ -511,12 +572,19 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
       ),
       trailing: Text(
         current.toStringAsFixed(current % 1 == 0 ? 0 : 2),
-        style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontFamily: 'monospace',
+        ),
       ),
     );
   }
 
-  Widget _buildSwitchSetting(String title, bool current, ValueChanged<bool> onChanged) {
+  Widget _buildSwitchSetting(
+    String title,
+    bool current,
+    ValueChanged<bool> onChanged,
+  ) {
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(title, style: const TextStyle(fontSize: 13)),
@@ -526,14 +594,29 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
   }
 
   Widget _buildDropdownFontWeight() {
-    final weights = [FontWeight.w300, FontWeight.w400, FontWeight.w500, FontWeight.w700];
+    final weights = [
+      FontWeight.w300,
+      FontWeight.w400,
+      FontWeight.w500,
+      FontWeight.w700,
+    ];
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      title: const Text('Font weight (fontWeight)', style: TextStyle(fontSize: 13)),
+      title: const Text(
+        'Font weight (fontWeight)',
+        style: TextStyle(fontSize: 13),
+      ),
       trailing: DropdownButton<FontWeight>(
         value: _fontWeight,
         dropdownColor: const Color(0xFF1F1F1F),
-        items: weights.map((w) => DropdownMenuItem(value: w, child: Text(w.toString().split('.').last))).toList(),
+        items: weights
+            .map(
+              (w) => DropdownMenuItem(
+                value: w,
+                child: Text(w.toString().split('.').last),
+              ),
+            )
+            .toList(),
         onChanged: (v) {
           if (v != null) {
             setState(() {
@@ -546,7 +629,11 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
     );
   }
 
-  Widget _buildColorPickerSetting(String title, Color current, ValueChanged<Color> onChanged) {
+  Widget _buildColorPickerSetting(
+    String title,
+    Color current,
+    ValueChanged<Color> onChanged,
+  ) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(title, style: const TextStyle(fontSize: 13)),
@@ -571,7 +658,10 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
     );
   }
 
-  Future<void> _showColorPickerDialog(Color initialColor, ValueChanged<Color> onColorChanged) async {
+  Future<void> _showColorPickerDialog(
+    Color initialColor,
+    ValueChanged<Color> onColorChanged,
+  ) async {
     Color selectedColor = initialColor;
 
     await showDialog(
@@ -588,7 +678,10 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
             TextButton(
               onPressed: () {
                 onColorChanged(selectedColor);
@@ -602,7 +695,11 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
     );
   }
 
-  Widget _buildDurationSetting(String title, Duration current, ValueChanged<Duration> onChanged) {
+  Widget _buildDurationSetting(
+    String title,
+    Duration current,
+    ValueChanged<Duration> onChanged,
+  ) {
     int seconds = current.inSeconds;
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -620,7 +717,10 @@ class _BarrageConfigPanelScreenState extends State<BarrageConfigPanelScreen> {
           });
         },
       ),
-      trailing: Text('${seconds}s', style: const TextStyle(fontWeight: FontWeight.bold)),
+      trailing: Text(
+        '${seconds}s',
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
     );
   }
 }
@@ -630,7 +730,11 @@ class ColorPickerGrid extends StatelessWidget {
   final Color selectedColor;
   final Function(Color) onColorSelected;
 
-  const ColorPickerGrid({super.key, required this.selectedColor, required this.onColorSelected});
+  const ColorPickerGrid({
+    super.key,
+    required this.selectedColor,
+    required this.onColorSelected,
+  });
 
   static const List<Color> _colors = [
     Colors.red,
@@ -669,7 +773,12 @@ class ColorPickerGrid extends StatelessWidget {
             height: 32,
             decoration: BoxDecoration(
               color: color,
-              border: Border.all(color: selectedColor == color ? Colors.black : Colors.transparent, width: 2),
+              border: Border.all(
+                color: selectedColor == color
+                    ? Colors.black
+                    : Colors.transparent,
+                width: 2,
+              ),
               borderRadius: BorderRadius.circular(4),
             ),
           ),

@@ -14,7 +14,8 @@ import '../core/barrage_context.dart';
 /// so swapping beats a periodic sweep: no dead entries linger in the list
 /// and render or hit-testing never walks them.
 class BarrageMotionSystem extends Component {
-  BarrageMotionSystem(this._ctx, {int priority = 200}) : super(priority: priority);
+  BarrageMotionSystem(this._ctx, {int priority = 200})
+    : super(priority: priority);
 
   final BarrageContext _ctx;
 
@@ -203,6 +204,10 @@ class BarrageMotionSystem extends Component {
   /// Drops the entry's claim on its bitmap, then returns it to the pool. Safe
   /// to call twice: the second call finds nothing left to release.
   void _release(BarrageEntry entry) {
+    final trackIndex = entry.track;
+    if (trackIndex >= 0 && trackIndex < _ctx.trackManager.tracks.length) {
+      _ctx.trackManager.tracks[trackIndex].detach(entry);
+    }
     final render = entry.render;
     if (render != null) {
       entry.render = null;

@@ -1,6 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flame_barrage/flame_barrage.dart';
 
+/// How scrolling messages get their speed.
+enum BarrageSpeedMode {
+  /// Every message crosses at [BarrageConfig.baseSpeed] pixels per second,
+  /// regardless of its width or the viewport (the legacy behaviour).
+  fixed,
+
+  /// The crossing time comes from the viewport width and the message's own
+  /// laid-out width, so long messages stay longer and the rhythm reads like a
+  /// live player rather than a constant conveyor belt.
+  adaptive,
+}
+
 /// Configuration class managing the core hyper-parameters, cache sizing
 /// limitations, and rendering rules of the barrage orchestration engine.
 class BarrageConfig {
@@ -23,7 +35,7 @@ class BarrageConfig {
     this.bottomAreaDistance = 0,
     this.fixedDuration = const Duration(seconds: 4),
     this.safeArea = true,
-    this.fps = 60,
+    this.fps = 0,
     this.trackHeight = 36,
     this.emojiSize = 24,
     this.maxVisibleCount = 80,
@@ -32,6 +44,9 @@ class BarrageConfig {
     this.emitInterval = 0.1,
     this.realtimeMode = false,
     this.baseSpeed = 120.0,
+    this.speedMode = BarrageSpeedMode.adaptive,
+    this.speedPlus = 1.0,
+    this.maxDispatchPerSecond = 60,
     this.strokeWidth = 1.0,
     this.overlapSafeGap = 40.0,
     this.hideTop = false,
@@ -93,7 +108,10 @@ class BarrageConfig {
   /// Automatically adjusts allocation vertical layout based on device safe insets.
   final bool safeArea;
 
-  /// The target frame rate frequency utilized for asynchronous telemetry calculations.
+  /// Logic steps per second. `0` (the default) follows the display refresh
+  /// rate, so a 75 Hz or 144 Hz panel advances motion on every frame instead
+  /// of being quantised down to 60 Hz. A positive value caps the logic step
+  /// rate for low-power devices while the display keeps repainting.
   final int fps;
 
   /// The total structural height allocated to a single track row layer row.
@@ -122,8 +140,24 @@ class BarrageConfig {
   /// trailing the queue; the trade-off is a denser screen during those bursts.
   final bool realtimeMode;
 
-  /// The internal pixel-per-second velocity reference mapping baseline tracking constraint.
+  /// Pixels per second used by [BarrageSpeedMode.fixed]. Adaptive mode derives
+  /// speed from the viewport and the message width instead; a per-message
+  /// [BarrageItem.baseSpeed] overrides both modes.
   final double baseSpeed;
+
+  /// How a scrolling message's speed is chosen. The default derives it from
+  /// the viewport and message width; [BarrageSpeedMode.fixed] uses the old
+  /// constant speed.
+  final BarrageSpeedMode speedMode;
+
+  /// Multiplier applied on top of the adaptive speed. 1.0 is the normal
+  /// rhythm; higher values make every message cross faster.
+  final double speedPlus;
+
+  /// Upper bound on dispatches per second in [realtimeMode]; 0 disables the
+  /// cap. The default lets one second's worth of messages spread across frames
+  /// instead of a large burst appearing in a single frame.
+  final int maxDispatchPerSecond;
 
   /// The mandatory clearance width buffer required between tailgating elements to avoid overlap.
   final double overlapSafeGap;
@@ -217,6 +251,9 @@ class BarrageConfig {
     double? emitInterval,
     bool? realtimeMode,
     double? baseSpeed,
+    BarrageSpeedMode? speedMode,
+    double? speedPlus,
+    int? maxDispatchPerSecond,
     double? overlapSafeGap,
     bool? noEmojiMode,
     int? barragePoolMaxSize,
@@ -255,6 +292,9 @@ class BarrageConfig {
       emitInterval: emitInterval ?? this.emitInterval,
       realtimeMode: realtimeMode ?? this.realtimeMode,
       baseSpeed: baseSpeed ?? this.baseSpeed,
+      speedMode: speedMode ?? this.speedMode,
+      speedPlus: speedPlus ?? this.speedPlus,
+      maxDispatchPerSecond: maxDispatchPerSecond ?? this.maxDispatchPerSecond,
       overlapSafeGap: overlapSafeGap ?? this.overlapSafeGap,
       hideTop: hideTop ?? this.hideTop,
       hideBottom: hideBottom ?? this.hideBottom,
@@ -301,6 +341,9 @@ class BarrageConfig {
         other.emitInterval == emitInterval &&
         other.realtimeMode == realtimeMode &&
         other.baseSpeed == baseSpeed &&
+        other.speedMode == speedMode &&
+        other.speedPlus == speedPlus &&
+        other.maxDispatchPerSecond == maxDispatchPerSecond &&
         other.overlapSafeGap == overlapSafeGap &&
         other.hideTop == hideTop &&
         other.hideBottom == hideBottom &&
@@ -344,6 +387,9 @@ class BarrageConfig {
       emitInterval,
       realtimeMode,
       baseSpeed,
+      speedMode,
+      speedPlus,
+      maxDispatchPerSecond,
       overlapSafeGap,
       hideTop,
       hideBottom,

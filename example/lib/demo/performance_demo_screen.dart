@@ -12,8 +12,12 @@ class PerformanceDemoScreen extends StatefulWidget {
 
 class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
   final BarrageController _controller = BarrageController();
-  final FpsMonitor _fpsMonitor = FpsMonitor(sampleDuration: const Duration(milliseconds: 500));
+  final FpsMonitor _fpsMonitor = FpsMonitor(
+    sampleDuration: const Duration(milliseconds: 500),
+  );
+  final FrameTimingsMonitor _frameTimings = FrameTimingsMonitor();
   double _currentFps = 60.0;
+  FrameTimingsStats? _frameStats;
   Timer? _stressTimer;
   bool _isStressTesting = false;
   int _stressMessageIndex = 0;
@@ -28,10 +32,18 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
         });
       }
     });
+    _frameTimings.start((stats) {
+      if (mounted) setState(() => _frameStats = stats);
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       for (int i = 0; i < 3; i++) {
-        _controller.send(const BarrageItem(content: '🚀 Engine telemetry active - FPS sampling ready', type: BarrageType.scroll));
+        _controller.send(
+          const BarrageItem(
+            content: '🚀 Engine telemetry active - FPS sampling ready',
+            type: BarrageType.scroll,
+          ),
+        );
       }
     });
   }
@@ -40,6 +52,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
   void dispose() {
     _stressTimer?.cancel();
     _fpsMonitor.stop();
+    _frameTimings.stop();
     _controller.detach();
     super.dispose();
   }
@@ -56,7 +69,8 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
             _stressMessageIndex++;
             _controller.send(
               BarrageItem(
-                content: '🔥 300 msg/s stress test 💥 [pipeline #$_stressMessageIndex] - live hardware throughput probe',
+                content:
+                    '🔥 300 msg/s stress test 💥 [pipeline #$_stressMessageIndex] - live hardware throughput probe',
                 type: BarrageType.scroll,
               ),
             );
@@ -86,11 +100,19 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
         backgroundColor: const Color(0xFF1F1F1F),
         title: const Text(
           'Engine metrics and live config sync',
-          style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white70,
+            size: 18,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -116,7 +138,10 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Render engine FPS', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                      const Text(
+                        'Render engine FPS',
+                        style: TextStyle(color: Colors.white38, fontSize: 12),
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         '${_currentFps.toStringAsFixed(1)} Hz',
@@ -124,24 +149,56 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
                           fontSize: 28,
                           fontFamily: 'monospace',
                           fontWeight: FontWeight.bold,
-                          color: _currentFps > 55 ? Colors.greenAccent : Colors.orangeAccent,
+                          color: _currentFps > 55
+                              ? Colors.greenAccent
+                              : Colors.orangeAccent,
                         ),
                       ),
+                      if (_frameStats case final stats?) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'UI ${stats.buildMs.toStringAsFixed(1)} ms · '
+                          'Raster ${stats.rasterMs.toStringAsFixed(1)} ms · '
+                          'Jank ${stats.jankFrames}/${stats.samples}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                            color: stats.hasJank
+                                ? Colors.orangeAccent
+                                : Colors.white54,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isStressTesting ? Colors.redAccent : const Color(0xFF722ED1),
+                    backgroundColor: _isStressTesting
+                        ? Colors.redAccent
+                        : const Color(0xFF722ED1),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: _toggleStressTest,
-                  icon: Icon(_isStressTesting ? Icons.stop_circle_outlined : Icons.bolt, size: 16),
+                  icon: Icon(
+                    _isStressTesting ? Icons.stop_circle_outlined : Icons.bolt,
+                    size: 16,
+                  ),
                   label: Text(
-                    _isStressTesting ? 'Stop stress pump' : 'Start 300 msg/s stress',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    _isStressTesting
+                        ? 'Stop stress pump'
+                        : 'Start 300 msg/s stress',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -172,14 +229,21 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen> {
               child: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.04),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       'Live engine config: fontSize ${currentConfig.fontSize}px | trackHeight ${currentConfig.trackHeight}px',
-                      style: const TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'monospace'),
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                      ),
                     ),
                   ),
                 ],

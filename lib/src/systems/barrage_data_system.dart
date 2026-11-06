@@ -11,6 +11,7 @@ import '../model/barrage/barrage_entry.dart';
 import '../model/barrage/barrage_item.dart';
 import '../model/barrage/barrage_track.dart';
 import '../model/barrage/barrage_type.dart';
+import '../scheduler/scroll_timing.dart';
 import '../scheduler/speed_strategy.dart';
 import '../scheduler/track_allocator.dart';
 import '../util/barrage_logger.dart';
@@ -57,6 +58,12 @@ class BarrageDataSystem extends Component {
   final Queue<_PendingBarrage> _pausedBuffer = Queue<_PendingBarrage>();
   double _emitTimer = 0.0;
   bool _paused = false;
+
+  /// Token bucket for realtime bursts: one second's worth of messages at
+  /// [BarrageConfig.maxDispatchPerSecond] may be dispatched, refilled by the
+  /// real frame time. A large burst therefore appears over successive frames
+  /// instead of spending the whole frame it arrives in.
+  double _dispatchCredit = 0.0;
 
   final TrackAllocator _trackAllocator = const TrackAllocator();
   final SpeedStrategy _speedStrategy = const SpeedStrategy();
@@ -148,6 +155,7 @@ class BarrageDataSystem extends Component {
     _timeline.clear();
     _paused = false;
     _emitTimer = 0.0;
+    _dispatchCredit = 0.0;
     _relayoutQueue.clear();
     _relayoutIndex = 0;
     for (final render in _bakeQueue) {
@@ -164,7 +172,8 @@ class BarrageDataSystem extends Component {
     final before = _waiting.length + _pausedBuffer.length;
     _waiting.removeWhere((pending) => predicate(pending.item));
     _pausedBuffer.removeWhere((pending) => predicate(pending.item));
-    return before - (_waiting.length + _pausedBuffer.length) +
+    return before -
+        (_waiting.length + _pausedBuffer.length) +
         _timeline.retractWhere(predicate);
   }
 
@@ -175,17 +184,25 @@ class BarrageDataSystem extends Component {
     _runScheduledRelayout();
     if (_ctx.config.realtimeMode) {
       // Unthrottled: flush the waiting queue every logic frame, still bounded
-      // by maxVisibleCount and lane availability. Bursts appear the moment
-      // they arrive instead of trailing the pacing timer — but no more than
-      // [_realtimeDispatchCap] per frame: each dispatch lays out and records
-      // a message, and an unbounded flush of a large burst would spend the
-      // whole frame budget the moment the burst lands.
+      // by maxVisibleCount, lane availability and — when configured — a
+      // per-second token bucket. The bucket turns a large burst into a short
+      // smooth run across frames instead of a single-frame clump, while
+      // [_realtimeDispatchCap] remains the hard per-frame guard.
+      final limit = _ctx.config.maxDispatchPerSecond;
+      if (limit > 0) {
+        _dispatchCredit = math.min(
+          limit.toDouble(),
+          _dispatchCredit + dt * limit,
+        );
+      }
       final now = _ctx.clock.nowPrecise();
       int dispatched = 0;
       while (_waiting.isNotEmpty &&
           _ctx.aliveCount < _ctx.config.maxVisibleCount &&
-          dispatched < _realtimeDispatchCap) {
+          dispatched < _realtimeDispatchCap &&
+          (limit <= 0 || _dispatchCredit >= 1.0)) {
         if (!_dispatchOne(now)) break;
+        if (limit > 0) _dispatchCredit -= 1.0;
         dispatched++;
       }
     } else {
@@ -215,7 +232,11 @@ class BarrageDataSystem extends Component {
     for (final pending in _waiting) {
       if (warmed >= _prepareAhead) break;
       final fragments = _ctx.parser.parse(pending.item.content);
-      _ctx.layout.layout(fragments, item: pending.item, config: _resolveConfig(pending.item));
+      _ctx.layout.layout(
+        fragments,
+        item: pending.item,
+        config: _resolveConfig(pending.item),
+      );
       warmed++;
     }
   }
@@ -237,7 +258,8 @@ class BarrageDataSystem extends Component {
     // Drain messages whose type was hidden after they queued, so toggling a
     // visibility filter does not leave a backlog that takes one emit slot
     // each to disappear.
-    while (_waiting.isNotEmpty && _ctx.config.isTypeHidden(_waiting.first.item.type)) {
+    while (_waiting.isNotEmpty &&
+        _ctx.config.isTypeHidden(_waiting.first.item.type)) {
       _waiting.removeFirst();
     }
     if (_waiting.isEmpty) return false;
@@ -250,14 +272,20 @@ class BarrageDataSystem extends Component {
     _ctx.trackManager.initialize(config, _ctx.allowedHeight);
     if (_ctx.trackManager.tracks.isEmpty) return false;
     final fragments = _ctx.parser.parse(item.content);
-    final layoutResult = _ctx.layout.layout(fragments, item: item, config: config);
+    final layoutResult = _ctx.layout.layout(
+      fragments,
+      item: item,
+      config: config,
+    );
     final entry = _ctx.pool.obtain(item: item, creationTime: now.round())
       ..width = layoutResult.width
       ..height = layoutResult.height
       ..lastUpdateTime = now
       ..spawnTime = now.round()
       ..expireTime = now.round() + config.fixedDurationMs;
-    entry.speed = item.type == BarrageType.scroll && fxEffect == null ? config.baseSpeed : 0.0;
+    entry.speed = item.type == BarrageType.scroll && fxEffect == null
+        ? _baseSpeedFor(item, config, layoutResult.width)
+        : 0.0;
     final trackIndex = _trackAllocator.allocate(
       tracks: _ctx.trackManager.tracks,
       current: entry,
@@ -271,7 +299,13 @@ class BarrageDataSystem extends Component {
     _waiting.removeFirst();
     final track = _ctx.trackManager.tracks[trackIndex];
     if (item.type == BarrageType.scroll && fxEffect == null) {
-      entry.speed = _speedStrategy.calculate(entry, _ctx.viewport.x, config, targetTrack: track);
+      entry.speed = _speedStrategy.calculate(
+        entry,
+        _ctx.viewport.x,
+        config,
+        targetTrack: track,
+        candidateSpeed: entry.speed,
+      );
     }
     track.lastLaunchTime = now.round();
     final cacheKey = buildCacheKey(item);
@@ -302,9 +336,9 @@ class BarrageDataSystem extends Component {
     if (fxEffect != null) {
       _spawnEffectShow(entry, fxEffect, startY, track, now);
     }
-    track.lastRight = startX + layoutResult.width;
-    track.lastEntry = entry;
-    track.activeCount++;
+    // The lane's live-entry list carries the right edge from this exact frame:
+    // allocation no longer waits for the next ~32 ms metrics tick to see it.
+    track.attach(entry);
     _ctx.activeEntries.add(entry);
     _ctx.aliveCount++;
     return true;
@@ -374,7 +408,8 @@ class BarrageDataSystem extends Component {
   void _runScheduledRelayout() {
     if (_relayoutQueue.isEmpty) return;
     int processed = 0;
-    while (_relayoutIndex < _relayoutQueue.length && processed < _relayoutBatchSize) {
+    while (_relayoutIndex < _relayoutQueue.length &&
+        processed < _relayoutBatchSize) {
       final entry = _relayoutQueue[_relayoutIndex];
       _relayoutIndex++;
       // A null render means the entry was recycled since the snapshot: it is
@@ -421,7 +456,11 @@ class BarrageDataSystem extends Component {
     final trackCount = _ctx.trackManager.tracks.length;
     final config = _resolveConfig(entry.item);
     final fragments = _ctx.parser.parse(entry.item.content);
-    final layoutResult = _ctx.layout.layout(fragments, item: entry.item, config: config);
+    final layoutResult = _ctx.layout.layout(
+      fragments,
+      item: entry.item,
+      config: config,
+    );
     if (entry.track >= trackCount) entry.track = trackCount - 1;
     final trackIndex = entry.track.clamp(0, trackCount - 1);
 
@@ -437,10 +476,26 @@ class BarrageDataSystem extends Component {
       _ctx.renderCache.release(oldRender);
     }
 
+    if (entry.item.type == BarrageType.scroll &&
+        entry.fx == null &&
+        trackIndex < _ctx.trackManager.tracks.length) {
+      entry.speed = _speedStrategy.calculate(
+        entry,
+        _ctx.viewport.x,
+        config,
+        targetTrack: _ctx.trackManager.tracks[trackIndex],
+        candidateSpeed: _baseSpeedFor(entry.item, config, layoutResult.width),
+      );
+    }
+
     final double centerY = (config.trackHeight - layoutResult.height) / 2;
     switch (entry.item.type) {
       case BarrageType.bottomFixed:
-        entry.y = _ctx.viewport.y - _ctx.bottomOffset - ((trackIndex + 1) * config.trackHeight) + centerY;
+        entry.y =
+            _ctx.viewport.y -
+            _ctx.bottomOffset -
+            ((trackIndex + 1) * config.trackHeight) +
+            centerY;
         entry.x = (_ctx.viewport.x - layoutResult.width) / 2;
         break;
       case BarrageType.topFixed:
@@ -451,6 +506,31 @@ class BarrageDataSystem extends Component {
         entry.y = _ctx.topOffset + (trackIndex * config.trackHeight) + centerY;
         break;
     }
+  }
+
+  /// The base speed for a scroll message of [textWidth]: the item's own
+  /// override, the legacy fixed speed, or the adaptive crossing time.
+  double _baseSpeedFor(
+    BarrageItem item,
+    BarrageConfig config,
+    double textWidth,
+  ) {
+    final override = item.baseSpeed;
+    if (override != null) return override;
+    if (config.speedMode == BarrageSpeedMode.fixed) {
+      return config.baseSpeed * config.speedPlus;
+    }
+    final viewportWidth = _ctx.viewport.x;
+    final duration = ScrollTiming.durationFor(
+      viewportWidth: viewportWidth,
+      textWidth: textWidth,
+    );
+    return ScrollTiming.speedFor(
+      viewportWidth: viewportWidth,
+      textWidth: textWidth,
+      duration: duration,
+      speedPlus: config.speedPlus,
+    );
   }
 
   BarrageConfig _resolveConfig(BarrageItem item) {
@@ -527,22 +607,30 @@ class BarrageDataSystem extends Component {
   /// for baking when it has no bitmap yet. The returned reference is owned by
   /// the caller and must be handed to the motion system's release with its
   /// barrage.
-  CachedRender _renderFor(String cacheKey, BarrageItem item, LayoutResult layoutResult) {
+  CachedRender _renderFor(
+    String cacheKey,
+    BarrageItem item,
+    LayoutResult layoutResult,
+  ) {
     final cached = _ctx.renderCache.acquire(cacheKey);
     if (cached != null) {
       _enqueueBake(cached);
       return cached;
     }
-    final render = CachedRender(picture: _ctx.renderer.buildPicture(layoutResult))
-      ..contentWidth = layoutResult.width
-      ..contentHeight = layoutResult.height;
+    final render =
+        CachedRender(picture: _ctx.renderer.buildPicture(layoutResult))
+          ..contentWidth = layoutResult.width
+          ..contentHeight = layoutResult.height;
     final stored = _ctx.renderCache.put(cacheKey, render);
     _enqueueBake(stored);
     return stored;
   }
 
   void _enqueueBake(CachedRender render) {
-    if (!_ctx.config.rasterizeItems || !_ctx.renderCache.rasterizationSupported) return;
+    if (!_ctx.config.rasterizeItems ||
+        !_ctx.renderCache.rasterizationSupported) {
+      return;
+    }
     if (render.bakeQueued || render.isDisposed || render.hasImage) return;
     render.bakeQueued = true;
     _bakeQueue.add(render);
@@ -552,7 +640,8 @@ class BarrageDataSystem extends Component {
   /// each frame so freshly baked bitmaps are blitted the same frame.
   void _drainBakeQueue() {
     if (_bakeQueue.isEmpty) return;
-    if (!_ctx.config.rasterizeItems || !_ctx.renderCache.rasterizationSupported) {
+    if (!_ctx.config.rasterizeItems ||
+        !_ctx.renderCache.rasterizationSupported) {
       for (final render in _bakeQueue) {
         render.bakeQueued = false;
       }
@@ -581,22 +670,34 @@ class BarrageDataSystem extends Component {
   /// costs one textured quad per frame instead of re-running its text, stroke,
   /// shadow and emoji operations.
   void _bakeRender(CachedRender render, double width, double height) {
-    if (!_ctx.config.rasterizeItems || !_ctx.renderCache.rasterizationSupported) return;
+    if (!_ctx.config.rasterizeItems ||
+        !_ctx.renderCache.rasterizationSupported) {
+      return;
+    }
     if (width <= 0 || height <= 0) return;
 
     final double scale = _ctx.rasterScale;
     final double paddedWidth = (width + _rasterPadding * 2) * scale;
     final double paddedHeight = (height + _rasterPadding * 2) * scale;
-    if (paddedWidth > _maxRasterDimension || paddedHeight > _maxRasterDimension) return;
+    if (paddedWidth > _maxRasterDimension ||
+        paddedHeight > _maxRasterDimension) {
+      return;
+    }
 
     try {
       final recorder = ui.PictureRecorder();
-      final canvas = ui.Canvas(recorder, ui.Rect.fromLTWH(0, 0, paddedWidth, paddedHeight));
+      final canvas = ui.Canvas(
+        recorder,
+        ui.Rect.fromLTWH(0, 0, paddedWidth, paddedHeight),
+      );
       canvas.scale(scale);
       canvas.translate(_rasterPadding, _rasterPadding);
       canvas.drawPicture(render.picture);
       final source = recorder.endRecording();
-      render.image = source.toImageSync(paddedWidth.ceil(), paddedHeight.ceil());
+      render.image = source.toImageSync(
+        paddedWidth.ceil(),
+        paddedHeight.ceil(),
+      );
       render.rasterSource = source;
       render.padding = _rasterPadding;
       render.rasterWidth = width + _rasterPadding * 2;
@@ -612,7 +713,10 @@ class BarrageDataSystem extends Component {
       render.image = null;
       render.rasterSource?.dispose();
       render.rasterSource = null;
-      BarrageLogger.w('Performance', 'bitmap baking unavailable, falling back to vector drawing: $error');
+      BarrageLogger.w(
+        'Performance',
+        'bitmap baking unavailable, falling back to vector drawing: $error',
+      );
     }
   }
 
