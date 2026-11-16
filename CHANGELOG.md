@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
+## Unreleased
+
+### Fixed
+
+- **Zero-speed lane avalanche.** `SpeedStrategy.calculate` divided the lane leader's remaining screen time by its speed without guarding non-positive values; with Dart doubles that yields `+Infinity`, collapsing `maxAllowedSpeed` to `last.speed` and clamping every follower to `0`. A scrolling message stops only when `x + width < 0`, so frozen entries never retired and each lane filled up with immobile messages. A zero-speed seed is easy to hit before web fonts load (`speedFor(viewportWidth: 0, textWidth: 0)` is `0`) or wherever a 0-width layout lands first in a lane. A non-positive-speed predecessor now contributes no clamp information, the clamped fallback is floored above zero, and dispatch refuses to emit a scrolling entry whose final speed is not positive (it is requeued with its original timed flag and enqueue time instead).
+
 ## 0.0.11
 
 ### Changed - Display-synced flow and adaptive scroll timing

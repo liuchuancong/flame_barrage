@@ -265,6 +265,8 @@ class BarrageDataSystem extends Component {
     if (_waiting.isEmpty) return false;
     if (_ctx.aliveCount >= _ctx.config.maxVisibleCount) return false;
     final item = _waiting.first.item;
+    final wasTimed = _waiting.first.timed;
+    final enqueuedAtMs = _waiting.first.enqueuedAtMs;
     // BarrageMotionEffect owns the motion of effect messages; the uniform
     // scroll strategy does not apply to them.
     final fxEffect = item.effect;
@@ -299,6 +301,7 @@ class BarrageDataSystem extends Component {
     _waiting.removeFirst();
     final track = _ctx.trackManager.tracks[trackIndex];
     if (item.type == BarrageType.scroll && fxEffect == null) {
+      final double candidate = entry.speed;
       entry.speed = _speedStrategy.calculate(
         entry,
         _ctx.viewport.x,
@@ -306,6 +309,32 @@ class BarrageDataSystem extends Component {
         targetTrack: track,
         candidateSpeed: entry.speed,
       );
+      // Guard the invariant "a scrolling message always moves": any source
+      // of a zero/negative speed (a 0-width layout before web fonts load,
+      // a pathological strategy input, a viewport that has not been sized
+      // yet) would otherwise put an entry on screen that can never reach
+      // the retirement condition `x + width < 0`, permanently occupying
+      // the lane and piling up on screen. Fall back to the pre-strategy
+      // candidate, and past that to a plain full-crossing estimate.
+      if (entry.speed <= 0) {
+        final double vw = _ctx.viewport.x;
+        final double tw = layoutResult.width;
+        entry.speed = candidate > 0
+            ? candidate
+            : (vw > 0 && tw > 0 ? (vw + tw) / 4.5 : 0.0);
+        // Still nothing usable (e.g. 0-width layout on an unsized
+        // viewport): keep the message waiting instead of emitting a
+        // frozen entry; it will be retried next frame with real metrics.
+        // The original timed flag and wall-clock enqueue time are kept,
+        // so requeueing neither grants a live message the age exemption
+        // it never had nor restarts its staleness clock.
+        if (entry.speed <= 0) {
+          _waiting.addFirst(
+            _PendingBarrage(item, enqueuedAtMs, timed: wasTimed),
+          );
+          return true;
+        }
+      }
     }
     track.lastLaunchTime = now.round();
     final cacheKey = buildCacheKey(item);
