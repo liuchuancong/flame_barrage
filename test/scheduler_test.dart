@@ -173,6 +173,30 @@ void main() {
         120,
       );
     });
+
+    test('a frozen (zero-speed) leader does not clamp followers to zero', () {
+      // Regression for the lane-freeze avalanche: with the old math,
+      // lastRight / last.speed = +Infinity when the leader stands still,
+      // maxAllowedSpeed collapsed to 0 and every follower was clamped to
+      // leader.speed * 0.95 — also 0. The lane then never retired a message
+      // (retirement fires only when x + width < 0) and messages piled up on
+      // screen. A zero-speed seed is easy to hit when a layout width comes
+      // back 0 (e.g. web fonts not ready yet).
+      final track = BarrageTrack(index: 0);
+      final frozen = _entry('frozen', x: 300, width: 200, speed: 0);
+      track.attach(frozen);
+
+      final result = strategy.calculate(
+        _entry('follower'),
+        1000,
+        config,
+        targetTrack: track,
+        candidateSpeed: 180,
+      );
+
+      expect(result, greaterThan(0));
+      expect(result, 180);
+    });
   });
 
   group('TrackAllocator with live lane entries', () {
